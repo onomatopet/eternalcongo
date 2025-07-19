@@ -11,7 +11,10 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware) {
-        //
+        // Enregistrer le middleware check_admin_role
+        $middleware->alias([
+            'check_admin_role' => \App\Http\Middleware\CheckAdminRole::class,
+        ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {
         //
