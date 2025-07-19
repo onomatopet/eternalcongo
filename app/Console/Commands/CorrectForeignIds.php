@@ -10,39 +10,13 @@ use Illuminate\Support\Facades\Schema;
 
 class CorrectForeignIds extends Command
 {
-    /**
-     * The name and signature of the console command.
-     *
-     * @var string
-     */
-    protected $signature = 'app:correct-foreign-ids {--force : Skip confirmation}';
+    protected $signature = 'app:correct-foreign-ids {--force : Skip confirmation} {--chunk=500 : Chunk size}';
 
-    /**
-     * The console command description.
-     *
-     * @var string
-     */
-    protected $description = 'Corrects columns storing distributor matricules to store primary IDs instead, and copies achat data.';
+    protected $description = 'Corrects columns storing distributor matricules to store primary IDs. Orphaned parent links are set to NULL.';
 
-    /**
-     * Lookup map [matricule => primary_key_id].
-     * @var Collection|null
-     */
-    protected ?Collection $matriculeToIdMap = null;
-
-    /**
-     * Stores details of orphan records found during processing.
-     * Structure: ['table_name' => [['row_id' => id, 'column' => name, 'invalid_value' => value], ...]]
-     * @var array
-     */
-    protected array $orphanDetails = [];
-
-    /**
-     * Configuration des tables et colonnes à corriger.
-     * Format: 'table_name' => ['colonne_a_corriger_1', 'colonne_a_corriger_2', ...]
-     * @var array
-     */
-    protected array $tablesToCorrect = [
+    private ?Collection $matriculeToIdMap = null;
+    private array $orphanDetails = [];
+    private array $tablesToCorrect = [
         'distributeurs'             => ['id_distrib_parent'],
         'level_currents'            => ['distributeur_id', 'id_distrib_parent'],
         'level_current_histories'   => ['distributeur_id', 'id_distrib_parent'],
@@ -50,47 +24,134 @@ class CorrectForeignIds extends Command
         'bonuses'                   => ['distributeur_id'],
     ];
 
-    /**
-     * Execute the console command.
-     */
     public function handle(): int
     {
-        $this->warn("!!! IMPORTANT !!!");
-        $this->warn("This command will permanently modify foreign key data across multiple tables.");
-        $this->warn("Ensure you have a reliable database backup BEFORE proceeding.");
-
-        if (!$this->option('force') && !$this->confirm('Do you want to continue? [y/N]', false)) {
-            $this->comment('Operation cancelled.');
+        $this->warn("--- Starting In-Place Foreign ID Correction Process ---");
+        $this->warn("This will modify data to use Primary IDs. Orphaned PARENT links will be set to NULL.");
+        $this->warn("Orphaned main distributor links (in achats, bonuses, etc.) will be REPORTED as errors.");
+        if (!$this->option('force') && !$this->confirm("BACKUP YOUR DATABASE FIRST! Proceed?")) {
+            $this->comment("Operation cancelled.");
             return self::FAILURE;
         }
 
-        // --- 1. Build the Distributor Lookup Map ---
-        $this->line("\n<fg=cyan>Step 1: Building distributor matricule-to-id map...</>");
-        if (!$this->buildDistributorMap()) {
-            return self::FAILURE; // Arrêter si la map ne peut pas être construite
+        $this->line("\nBuilding matricule-to-ID map from 'distributeurs' table...");
+        if (!$this->buildMatriculeMap()) {
+            return self::FAILURE;
         }
-        $this->info('Distributor map built successfully (' . $this->matriculeToIdMap->count() . ' entries).');
+        $this->info("Map built successfully with " . $this->matriculeToIdMap->count() . " entries.");
 
-        // --- 2. Process Each Table for ID Correction ---
-        $this->line("\n<fg=cyan>Step 2: Correcting Matricule references to Primary IDs...</>");
-        foreach ($this->tablesToCorrect as $tableName => $columns) {
-            $this->processIdCorrection($tableName, $columns);
+        $this->line("\nUpdating foreign key columns...");
+        DB::beginTransaction();
+        try {
+            foreach ($this->tablesToCorrect as $tableName => $columns) {
+                $this->processTable($tableName, $columns);
+            }
+
+            // Vérifier les orphelins CRITIQUES avant de committer
+            if (!empty($this->orphanDetails)) {
+                DB::rollBack(); // Annuler tout si des orphelins critiques sont trouvés
+                $this->displayOrphanReport();
+                return self::FAILURE;
+            }
+
+            DB::commit(); // Valider si tout est OK
+            $this->displayOrphanReport();
+            $this->info("<fg=green>Data correction successful. You should now be able to add foreign key constraints.</>");
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            $this->error("\nAn error occurred. All changes have been rolled back.");
+            $this->error($e->getMessage());
+            Log::critical("Foreign ID correction failed: " . $e->getMessage());
+            return self::FAILURE;
         }
-        $this->info('Finished ID correction.');
 
-        // --- 3. Copy Data in 'achats' table ---
-        $this->line("\n<fg=cyan>Step 3: Copying data in 'achats' table...</>");
-        $this->copyAchatData();
-        $this->info('Finished copying achat data.');
+        return self::SUCCESS;
+    }
 
+    private function buildMatriculeMap(): bool
+    {
+        try {
+            $this->matriculeToIdMap = DB::table('distributeurs')->whereNotNull('distributeur_id')->where('distributeur_id', '!=', 0)->pluck('id', 'distributeur_id');
+            if ($this->matriculeToIdMap === null) { $this->error("Failed to build map."); return false; }
+        } catch (\Exception $e) {
+            $this->error("Failed to build matricule map: " . $e->getMessage()); return false;
+        }
+        return true;
+    }
 
-        // --- 4. Final Report ---
-        $this->line("\n------------------------------------------");
-        $this->info('<fg=green>Foreign ID Correction Process Finished.</>');
+    private function processTable(string $tableName, array $columnsToCorrect): void
+    {
+        $this->info("  Processing table: <fg=yellow>{$tableName}</>");
+        $totalRows = DB::table($tableName)->count();
+        if ($totalRows === 0) { $this->line("    Table is empty. Skipping."); return; }
 
+        $progressBar = $this->output->createProgressBar($totalRows);
+        $progressBar->start();
+        $chunkSize = (int)$this->option('chunk');
+        $selectColumns = array_merge(['id'], $columnsToCorrect);
+
+        DB::table($tableName)->select($selectColumns)->orderBy('id')
+            ->chunkById($chunkSize, function (Collection $rows) use ($tableName, $columnsToCorrect, $progressBar) {
+                foreach ($rows as $row) {
+                    $rowUpdates = [];
+                    foreach ($columnsToCorrect as $columnName) {
+                        if (!property_exists($row, $columnName)) continue;
+                        $currentValue = $row->$columnName;
+
+                        if ($currentValue === null || !is_numeric($currentValue)) continue;
+                        if ($currentValue == 0) {
+                            $rowUpdates[$columnName] = null;
+                            continue;
+                        }
+
+                        $correctId = $this->matriculeToIdMap->get($currentValue);
+
+                        // --- NOUVELLE LOGIQUE DE GESTION DES ORPHELINS ---
+                        if ($correctId !== null) {
+                            // C'est un matricule valide, on le traduit en ID
+                            if ($currentValue != $correctId) {
+                                $rowUpdates[$columnName] = $correctId;
+                            }
+                        } else {
+                            // C'est un orphelin (matricule non trouvé dans la map)
+
+                            // Si c'est une colonne de PARENT, on met à NULL
+                            if (str_contains($columnName, 'parent')) { // Simple check sur le nom de la colonne
+                                $rowUpdates[$columnName] = null;
+                                Log::info("Orphan PARENT link found in {$tableName}: RowID={$row->id}, Col={$columnName}, Matricule={$currentValue}. SETTING TO NULL.");
+                            } else {
+                                // Sinon (ex: distributeur_id), c'est un orphelin CRITIQUE. On le signale.
+                                $this->orphanDetails[$tableName][] = [
+                                    'row_id' => $row->id,
+                                    'column' => $columnName,
+                                    'invalid_value' => $currentValue
+                                ];
+                                Log::warning("CRITICAL Orphan found in {$tableName}: RowID={$row->id}, Col={$columnName}, Matricule={$currentValue}. This must be fixed manually.");
+                            }
+                        }
+                        // --- FIN DE LA NOUVELLE LOGIQUE ---
+                    }
+                    if (!empty($rowUpdates)) {
+                        try {
+                            DB::table($tableName)->where('id', $row->id)->update($rowUpdates);
+                        } catch (\Exception $e) {
+                             Log::error("Failed to update RowID {$row->id} in {$tableName}: " . $e->getMessage());
+                        }
+                    }
+                }
+                $progressBar->advance($rows->count());
+            });
+        $progressBar->finish();
+        $this->info("\n    Finished processing {$tableName}.");
+    }
+
+    private function displayOrphanReport(): void
+    {
         if (!empty($this->orphanDetails)) {
             $totalOrphans = 0;
-            $this->warn("\n<fg=yellow>Orphan Records Found (Matricule not in 'distributeurs' map):</>");
+            $this->error("\n<fg=red>CRITICAL Orphan Records Found (Changes have been ROLLED BACK):</>");
+            $this->error("These are records (achats, bonuses, etc.) linked to a main distributor that does not exist.");
             foreach($this->orphanDetails as $table => $orphans) {
                  $this->warn("  Table '{$table}':");
                  foreach($orphans as $orphan) {
@@ -98,190 +159,10 @@ class CorrectForeignIds extends Command
                       $totalOrphans++;
                  }
             }
-             $this->error("\n{$totalOrphans} ORPHAN RECORDS DETECTED!");
-             $this->error("These rows were NOT updated and WILL CAUSE FOREIGN KEY CONSTRAINT ERRORS.");
-             $this->error("You MUST correct or delete these records manually before adding foreign keys.");
-             $this->line("------------------------------------------");
-             return self::FAILURE; // Important: Indiquer l'échec
+             $this->error("\nTotal: {$totalOrphans} CRITICAL orphan records found.");
+             $this->error("You MUST DELETE these specific records or INSERT the missing distributors before retrying.");
         } else {
-            $this->info("\nNo orphan records found.");
-            $this->info("<fg=green>Data correction seems successful. You should now be able to add foreign key constraints.</>");
-             $this->line("------------------------------------------");
-            return self::SUCCESS;
+            $this->info("\nNo critical orphan records found. All parent links have been corrected.");
         }
-    }
-
-    /**
-     * Build the Matricule -> ID map.
-     */
-    protected function buildDistributorMap(): bool
-    {
-        // Identique aux commandes précédentes
-        try {
-            $this->matriculeToIdMap = DB::table('distributeurs')
-                ->pluck('id', 'distributeur_id'); // Clé = Matricule, Valeur = ID Primaire
-
-            if ($this->matriculeToIdMap === null) {
-                 $this->error('Failed to build map (pluck returned null).'); return false;
-            }
-             if ($this->matriculeToIdMap->has(null) || $this->matriculeToIdMap->has('')) {
-                 $this->error('Found NULL or empty matricules (distributeur_id) in the distributeurs table. Cannot proceed.');
-                 return false;
-             }
-              // Vérification Doublon Matricule (Simple)
-             $duplicateCheck = DB::table('distributeurs')
-                ->select('distributeur_id')
-                ->groupBy('distributeur_id')
-                ->havingRaw('COUNT(*) > 1')
-                ->first();
-             if ($duplicateCheck) {
-                 $this->error("DUPLICATE matricule found: {$duplicateCheck->distributeur_id}. Cannot proceed with matricule-based correction.");
-                 return false;
-             }
-
-            return true;
-        } catch (\Exception $e) {
-            $this->error('Failed to build distributor map: ' . $e->getMessage());
-            return false;
-        }
-    }
-
-    /**
-     * Process ID correction for a specific table and columns.
-     */
-    protected function processIdCorrection(string $tableName, array $columnsToCorrect): void
-    {
-        $this->info("  Processing table: <fg=yellow>{$tableName}</>");
-        $totalRows = DB::table($tableName)->count();
-        if ($totalRows == 0) {
-            $this->line("    Table is empty. Skipping.");
-            return;
-        }
-
-        $progressBar = $this->output->createProgressBar($totalRows);
-        $progressBar->start();
-
-        // Sélectionner l'ID de la ligne + toutes les colonnes à corriger
-        $selectColumns = array_merge(['id'], $columnsToCorrect);
-
-        DB::table($tableName)
-            ->select($selectColumns)
-            ->orderBy('id')
-            ->chunkById(200, function (Collection $rows) use ($tableName, $columnsToCorrect, $progressBar) {
-                $updates = []; // [rowId => ['col1' => newId1, 'col2' => newId2]]
-
-                foreach ($rows as $row) {
-                    $rowUpdates = []; // Updates for this specific row
-
-                    foreach ($columnsToCorrect as $columnName) {
-                        $currentValue = $row->$columnName; // Matricule ou 0 ou NULL
-
-                        if ($currentValue === null) continue; // Déjà NULL, OK
-
-                        if ($currentValue === 0 || $currentValue === '0') {
-                             // Convertir 0 en NULL (la colonne doit être nullable)
-                             $rowUpdates[$columnName] = null;
-                             continue; // Passer à la colonne suivante pour cette ligne
-                        }
-
-                        // Rechercher le matricule dans la map
-                        $correctPrimaryKeyId = $this->matriculeToIdMap->get($currentValue);
-
-                        if ($correctPrimaryKeyId !== null) {
-                            // Matricule trouvé, mettre à jour si différent
-                            if ($currentValue != $correctPrimaryKeyId) {
-                                $rowUpdates[$columnName] = $correctPrimaryKeyId;
-                            }
-                        } else {
-                            // Matricule NON trouvé = ORPHELIN
-                            // Vérifier si ce n'est pas déjà un ID primaire valide (peu probable ici)
-                            if (!$this->matriculeToIdMap->contains($currentValue)){
-                                 $this->orphanDetails[$tableName][] = [
-                                     'row_id' => $row->id,
-                                     'column' => $columnName,
-                                     'invalid_value' => $currentValue
-                                 ];
-                                 Log::warning("Orphan detected: Table={$tableName}, RowID={$row->id}, Column={$columnName}, InvalidMatricule={$currentValue}");
-                            }
-                            // Ne pas ajouter aux $rowUpdates pour les orphelins
-                        }
-                    } // Fin foreach column
-
-                    // Planifier la mise à jour pour cette ligne si des changements sont nécessaires
-                    if (!empty($rowUpdates)) {
-                        $updates[$row->id] = $rowUpdates;
-                    }
-                } // Fin foreach row in chunk
-
-                // Appliquer les mises à jour pour ce chunk
-                if (!empty($updates)) {
-                    foreach ($updates as $rowId => $updateData) {
-                         try {
-                            DB::table($tableName)->where('id', $rowId)->update($updateData);
-                        } catch (\Exception $e) {
-                             Log::error("Failed to update RowID {$rowId} in {$tableName}: ".$e->getMessage()." | Data: ".json_encode($updateData));
-                             // Marquer comme orphelin si l'update échoue ?
-                             $this->orphanDetails[$tableName][] = ['row_id' => $rowId, 'column' => 'UPDATE_FAILED', 'invalid_value' => json_encode($updateData)];
-                        }
-                    }
-                }
-                $progressBar->advance($rows->count());
-                unset($rows); // Libérer mémoire
-                unset($updates); // Libérer mémoire
-
-            }); // Fin chunkById
-
-        $progressBar->finish();
-        $this->info("\n    Finished processing {$tableName}.");
-    }
-
-
-    /**
-     * Copy data between old and new columns in 'achats' table.
-     */
-    protected function copyAchatData(): void
-    {
-         $this->info("  Copying data within 'achats' table...");
-         try {
-             // Copier pointvaleur -> points_unitaire_achat
-             if (Schema::hasColumn('achats', 'pointvaleur') && Schema::hasColumn('achats', 'points_unitaire_achat')) {
-                  Log::info('    Copying pointvaleur -> points_unitaire_achat...');
-                 DB::table('achats')->whereNotNull('pointvaleur')->orderBy('id')->chunk(500, function ($chunk) {
-                     foreach ($chunk as $row) { DB::table('achats')->where('id', $row->id)->update(['points_unitaire_achat' => (float)$row->pointvaleur]); }
-                 });
-             } else { Log::warning('    Skipped copying pointvaleur data (column missing).');}
-
-             // Copier montant -> montant_total_ligne
-             if (Schema::hasColumn('achats', 'montant') && Schema::hasColumn('achats', 'montant_total_ligne')) {
-                  Log::info('    Copying montant -> montant_total_ligne...');
-                  DB::table('achats')->whereNotNull('montant')->orderBy('id')->chunk(500, function ($chunk) {
-                      foreach ($chunk as $row) { DB::table('achats')->where('id', $row->id)->update(['montant_total_ligne' => (float)$row->montant]); }
-                  });
-             } else { Log::warning('    Skipped copying montant data (column missing).'); }
-
-             // Remplir prix_unitaire_achat (si possible et souhaité)
-             if (Schema::hasColumn('achats', 'prix_unitaire_achat')) {
-                 Log::info('    Attempting to fill prix_unitaire_achat (best effort)...');
-                 // Jointure pour obtenir le prix actuel du produit et le mettre dans l'achat
-                 // ATTENTION: Ne reflète pas le prix historique si les prix changent !
-                 DB::table('achats as a')
-                    ->join('products as p', 'a.products_id', '=', 'p.id')
-                    ->where('a.prix_unitaire_achat', '=', 0.00) // Remplir seulement si vide (ou condition appropriée)
-                    ->orderBy('a.id')
-                    ->chunk(500, function($achatsToUpdate) {
-                        foreach ($achatsToUpdate as $achat) {
-                            DB::table('achats')
-                              ->where('id', $achat->id)
-                              ->update(['prix_unitaire_achat' => $achat->prix_product]); // Utilise prix actuel du produit
-                        }
-                         Log::info('    Processed chunk for filling prix_unitaire_achat.');
-                    });
-                  Log::info('    Finished attempting to fill prix_unitaire_achat.');
-             }
-
-         } catch (\Exception $e) {
-              $this->error("  ERROR during achat data copy: " . $e->getMessage());
-              // Ne pas arrêter forcément toute la commande, mais signaler l'échec de cette étape
-         }
     }
 }
