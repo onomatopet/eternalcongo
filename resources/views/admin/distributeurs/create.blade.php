@@ -365,26 +365,30 @@
         fetch(`{{ route('admin.distributeurs.search') }}?q=${encodeURIComponent(query)}`, {
             headers: {
                 'X-Requested-With': 'XMLHttpRequest',
+                'Accept': 'application/json',
                 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
             }
         })
-        .then(response => response.json())
+        .then(response => {
+            if (!response.ok) throw new Error('Network response was not ok');
+            return response.json();
+        })
         .then(data => {
             searchResults.innerHTML = '';
 
-            if (data.length === 0) {
+            if (!data.results || data.results.length === 0) {
                 searchResults.innerHTML = `
                     <div class="p-4 text-center text-gray-500">
                         Aucun distributeur trouvé
                     </div>
                 `;
             } else {
-                data.forEach(distributeur => {
+                data.results.forEach(distributeur => {
                     const item = document.createElement('div');
                     item.className = 'px-4 py-3 hover:bg-gray-50 cursor-pointer border-b last:border-b-0';
                     item.innerHTML = `
                         <div class="font-medium text-gray-900">
-                            #${distributeur.distributeur_id} - ${distributeur.pnom_distributeur} ${distributeur.nom_distributeur}
+                            ${distributeur.text}
                         </div>
                         ${distributeur.tel_distributeur ? `<div class="text-sm text-gray-500">${distributeur.tel_distributeur}</div>` : ''}
                     `;
@@ -394,6 +398,7 @@
             }
         })
         .catch(error => {
+            console.error('Search error:', error);
             searchResults.innerHTML = `
                 <div class="p-4 text-center text-red-500">
                     Erreur lors de la recherche
@@ -405,7 +410,7 @@
     // Sélectionner un parent
     function selectParent(distributeur) {
         parentIdInput.value = distributeur.id;
-        parentDisplay.textContent = `#${distributeur.distributeur_id} - ${distributeur.pnom_distributeur} ${distributeur.nom_distributeur}`;
+        parentDisplay.textContent = distributeur.text;
         selectedParentDiv.classList.remove('hidden');
         searchInput.value = '';
         searchResults.classList.add('hidden');
@@ -417,6 +422,7 @@
         parentIdInput.value = '';
         selectedParentDiv.classList.add('hidden');
         searchInput.value = '';
+        parentDisplay.textContent = '';
     }
 
     // Fermer les résultats quand on clique ailleurs
@@ -428,16 +434,23 @@
 
     // Si un parent était sélectionné (old value), l'afficher
     @if(old('id_distrib_parent'))
-        // Vous devrez faire une requête pour récupérer les infos du parent
-        fetch(`{{ route('admin.distributeurs.show', old('id_distrib_parent')) }}`, {
+        // Faire une requête pour récupérer les infos du parent
+        fetch(`{{ route('admin.distributeurs.show', '') }}/${encodeURIComponent('{{ old('id_distrib_parent') }}')}`, {
             headers: {
                 'X-Requested-With': 'XMLHttpRequest',
+                'Accept': 'application/json',
             }
         })
         .then(response => response.json())
-        .then(distributeur => {
-            selectParent(distributeur);
-        });
+        .then(data => {
+            if (data.distributeur) {
+                selectParent({
+                    id: data.distributeur.id,
+                    text: `#${data.distributeur.distributeur_id} - ${data.distributeur.pnom_distributeur} ${data.distributeur.nom_distributeur}`
+                });
+            }
+        })
+        .catch(error => console.error('Error loading parent:', error));
     @endif
 </script>
 @endpush

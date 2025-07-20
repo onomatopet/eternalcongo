@@ -66,82 +66,41 @@ class DistributeurController extends Controller
      */
     public function store(Request $request): RedirectResponse
     {
-        // Validation avancée
+        // Validation
         $validatedData = $request->validate([
-            'distributeur_id' => [
-                'required',
-                'string',
-                'max:50',
-                'unique:distributeurs,distributeur_id',
-                'regex:/^[A-Z0-9\-_]+$/i' // Format alphanumérique avec tirets et underscores
-            ],
-            'nom_distributeur' => [
-                'required',
-                'string',
-                'max:120',
-                'regex:/^[\pL\s\-\']+$/u' // Lettres, espaces, tirets et apostrophes
-            ],
-            'pnom_distributeur' => [
-                'required',
-                'string',
-                'max:120',
-                'regex:/^[\pL\s\-\']+$/u'
-            ],
-            'tel_distributeur' => [
-                'nullable',
-                'string',
-                'max:120',
-                'regex:/^[\+]?[0-9\s\-\(\)]+$/' // Format téléphone international
-            ],
-            'adress_distributeur' => 'nullable|string|max:255',
-            'id_distrib_parent' => [
-                'nullable',
-                'integer',
-                'exists:distributeurs,id',
-                function ($attribute, $value, $fail) {
-                    // Vérifier la profondeur de la hiérarchie (éviter les chaînes trop longues)
-                    if ($value) {
-                        $depth = $this->calculateDepth($value);
-                        if ($depth >= 10) {
-                            $fail('La chaîne de parrainage ne peut pas dépasser 10 niveaux.');
-                        }
-                    }
-                }
-            ],
-            'etoiles_id' => 'required|integer|min:1|max:10',
-            'rang' => 'required|integer|min:0',
-            'statut_validation_periode' => 'boolean',
-        ], [
-            // Messages personnalisés
-            'distributeur_id.required' => 'Le matricule est obligatoire.',
-            'distributeur_id.unique' => 'Ce matricule existe déjà.',
-            'distributeur_id.regex' => 'Le matricule ne peut contenir que des lettres, chiffres, tirets et underscores.',
-            'nom_distributeur.required' => 'Le nom est obligatoire.',
-            'nom_distributeur.regex' => 'Le nom ne peut contenir que des lettres, espaces, tirets et apostrophes.',
-            'pnom_distributeur.required' => 'Le prénom est obligatoire.',
-            'tel_distributeur.regex' => 'Le format du numéro de téléphone est invalide.',
-            'id_distrib_parent.exists' => 'Le distributeur parent sélectionné n\'existe pas.',
+            'nom_distributeur' => 'required|string|max:100',
+            'pnom_distributeur' => 'required|string|max:100',
+            'distributeur_id' => 'required|string|max:50|unique:distributeurs,distributeur_id',
+            'tel_distributeur' => 'nullable|string|max:20',
+            'email_distributeur' => 'nullable|email|max:100|unique:distributeurs,email_distributeur',
+            'id_distrib_parent' => 'nullable|integer|exists:distributeurs,id',
         ]);
 
-        // Transformer les données
-        $validatedData['statut_validation_periode'] = $validatedData['statut_validation_periode'] ?? true;
-        $validatedData['rang'] = $validatedData['rang'] ?? 0;
-
-        // Transaction pour garantir l'intégrité
         DB::beginTransaction();
         try {
+            // Vérifier la cohérence de la hiérarchie
+            if (!empty($validatedData['id_distrib_parent'])) {
+                // CORRECTION : Vérification d'existence du parent
+                $parent = Distributeur::find($validatedData['id_distrib_parent']);
+                if (!$parent) {
+                    throw new \Exception("Le distributeur parent sélectionné n'existe pas.");
+                }
+
+                // Calculer la profondeur
+                $depth = $this->calculateDepth($validatedData['id_distrib_parent']);
+                if ($depth >= 10) {
+                    throw new \Exception("La hiérarchie ne peut pas dépasser 10 niveaux.");
+                }
+            }
+
+            // Créer le distributeur
             $distributeur = Distributeur::create($validatedData);
 
-            // Log de l'action
-            Log::info("Distributeur créé", [
-                'id' => $distributeur->id,
-                'matricule' => $distributeur->distributeur_id,
-                'created_by' => auth()->id()
-            ]);
-
             DB::commit();
+            Log::info("Nouveau distributeur créé", ['id' => $distributeur->id, 'matricule' => $distributeur->distributeur_id]);
+
             return redirect()
-                ->route('admin.distributeurs.index')
+                ->route('admin.distributeurs.show', $distributeur)
                 ->with('success', 'Distributeur créé avec succès. Matricule: ' . $distributeur->distributeur_id);
 
         } catch (\Exception $e) {
@@ -152,7 +111,7 @@ class DistributeurController extends Controller
             ]);
             return back()
                 ->withInput()
-                ->with('error', 'Une erreur est survenue lors de la création du distributeur.');
+                ->with('error', 'Une erreur est survenue lors de la création du distributeur: ' . $e->getMessage());
         }
     }
 
@@ -182,7 +141,7 @@ class DistributeurController extends Controller
         $statistics = [
             'total_children' => $distributeur->children()->count(),
             'total_achats' => $distributeur->achats()->count(),
-            'last_achat' => $distributeur->achats()->latest()->first(),
+            'last_achat' => optional($distributeur->achats()->latest()->first()),
         ];
 
         return view('admin.distributeurs.show', compact('distributeur', 'statistics'));
@@ -212,82 +171,76 @@ class DistributeurController extends Controller
     {
         // Validation
         $validatedData = $request->validate([
+            'nom_distributeur' => 'required|string|max:100',
+            'pnom_distributeur' => 'required|string|max:100',
             'distributeur_id' => [
                 'required',
                 'string',
                 'max:50',
                 Rule::unique('distributeurs')->ignore($distributeur->id),
-                'regex:/^[A-Z0-9\-_]+$/i'
             ],
-            'nom_distributeur' => [
-                'required',
-                'string',
-                'max:120',
-                'regex:/^[\pL\s\-\']+$/u'
-            ],
-            'pnom_distributeur' => [
-                'required',
-                'string',
-                'max:120',
-                'regex:/^[\pL\s\-\']+$/u'
-            ],
-            'tel_distributeur' => [
+            'tel_distributeur' => 'nullable|string|max:20',
+            'email_distributeur' => [
                 'nullable',
-                'string',
-                'max:120',
-                'regex:/^[\+]?[0-9\s\-\(\)]+$/'
+                'email',
+                'max:100',
+                Rule::unique('distributeurs')->ignore($distributeur->id),
             ],
-            'adress_distributeur' => 'nullable|string|max:255',
-            'id_distrib_parent' => [
-                'nullable',
-                'integer',
-                'exists:distributeurs,id',
-                function ($attribute, $value, $fail) use ($distributeur) {
-                    // Empêcher de se définir comme son propre parent
-                    if ($value == $distributeur->id) {
-                        $fail('Un distributeur ne peut pas être son propre parent.');
-                    }
-                    // Empêcher de créer une boucle dans la hiérarchie
-                    if ($value && in_array($value, $this->getDescendantIds($distributeur->id))) {
-                        $fail('Cette modification créerait une boucle dans la hiérarchie.');
-                    }
-                }
-            ],
-            'etoiles_id' => 'required|integer|min:1|max:10',
-            'rang' => 'required|integer|min:0',
-            'statut_validation_periode' => 'boolean',
+            'id_distrib_parent' => 'nullable|integer|exists:distributeurs,id',
         ]);
-
-        $validatedData['statut_validation_periode'] = $validatedData['statut_validation_periode'] ?? false;
 
         DB::beginTransaction();
         try {
-            // Sauvegarder les anciennes valeurs pour le log
-            $oldData = $distributeur->toArray();
+            // Vérifier la cohérence de la hiérarchie si parent changé
+            if (isset($validatedData['id_distrib_parent']) &&
+                $validatedData['id_distrib_parent'] != $distributeur->id_distrib_parent) {
 
+                // CORRECTION : Vérification d'existence du parent
+                if ($validatedData['id_distrib_parent']) {
+                    $parent = Distributeur::find($validatedData['id_distrib_parent']);
+                    if (!$parent) {
+                        throw new \Exception("Le distributeur parent sélectionné n'existe pas.");
+                    }
+                }
+
+                // Ne peut pas être son propre parent
+                if ($validatedData['id_distrib_parent'] == $distributeur->id) {
+                    throw new \Exception("Un distributeur ne peut pas être son propre parent.");
+                }
+
+                // Vérifier qu'on ne crée pas de boucle
+                $descendantIds = $this->getDescendantIds($distributeur->id);
+                if (in_array($validatedData['id_distrib_parent'], $descendantIds)) {
+                    throw new \Exception("Impossible: cela créerait une boucle dans la hiérarchie.");
+                }
+
+                // Vérifier la profondeur
+                $depth = $this->calculateDepth($validatedData['id_distrib_parent']) + 1;
+                if ($depth >= 10) {
+                    throw new \Exception("La hiérarchie ne peut pas dépasser 10 niveaux.");
+                }
+            }
+
+            // Mettre à jour
             $distributeur->update($validatedData);
 
-            Log::info("Distributeur modifié", [
-                'id' => $distributeur->id,
-                'old_data' => $oldData,
-                'new_data' => $validatedData,
-                'updated_by' => auth()->id()
-            ]);
-
             DB::commit();
+            Log::info("Distributeur mis à jour", ['id' => $distributeur->id]);
+
             return redirect()
-                ->route('admin.distributeurs.index')
-                ->with('success', 'Distributeur modifié avec succès.');
+                ->route('admin.distributeurs.show', $distributeur)
+                ->with('success', 'Distributeur mis à jour avec succès.');
 
         } catch (\Exception $e) {
             DB::rollBack();
-            Log::error("Erreur modification distributeur", [
+            Log::error("Erreur mise à jour distributeur", [
                 'id' => $distributeur->id,
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
+                'data' => $validatedData
             ]);
             return back()
                 ->withInput()
-                ->with('error', 'Une erreur est survenue lors de la modification.');
+                ->with('error', 'Erreur lors de la mise à jour: ' . $e->getMessage());
         }
     }
 
@@ -296,26 +249,26 @@ class DistributeurController extends Controller
      */
     public function destroy(Distributeur $distributeur): RedirectResponse
     {
-        // Vérifications avant suppression
-        if ($distributeur->children()->exists()) {
-            return back()->with('error', 'Impossible de supprimer ce distributeur car il a des filleuls dans le réseau.');
-        }
-
-        if ($distributeur->achats()->exists()) {
-            return back()->with('error', 'Impossible de supprimer ce distributeur car il a des achats enregistrés.');
-        }
-
-        if ($distributeur->bonuses()->exists()) {
-            return back()->with('error', 'Impossible de supprimer ce distributeur car il a des bonus enregistrés.');
-        }
-
         DB::beginTransaction();
         try {
+            // Vérifier les dépendances
+            if ($distributeur->children()->exists()) {
+                throw new \Exception("Impossible de supprimer : ce distributeur a des enfants dans le réseau.");
+            }
+
+            if ($distributeur->achats()->exists()) {
+                throw new \Exception("Impossible de supprimer : ce distributeur a des achats enregistrés.");
+            }
+
+            if ($distributeur->bonuses()->exists()) {
+                throw new \Exception("Impossible de supprimer : ce distributeur a des bonus enregistrés.");
+            }
+
             // Log avant suppression
-            Log::info("Distributeur supprimé", [
+            Log::info("Suppression distributeur", [
                 'id' => $distributeur->id,
                 'matricule' => $distributeur->distributeur_id,
-                'deleted_by' => auth()->id()
+                'nom' => $distributeur->full_name
             ]);
 
             $distributeur->delete();
@@ -331,7 +284,7 @@ class DistributeurController extends Controller
                 'id' => $distributeur->id,
                 'error' => $e->getMessage()
             ]);
-            return back()->with('error', 'Une erreur est survenue lors de la suppression.');
+            return back()->with('error', $e->getMessage());
         }
     }
 
@@ -342,22 +295,41 @@ class DistributeurController extends Controller
     {
         $search = $request->get('q', '');
 
-        $distributeurs = Distributeur::where(function($query) use ($search) {
-                $query->where('nom_distributeur', 'LIKE', "%{$search}%")
-                      ->orWhere('pnom_distributeur', 'LIKE', "%{$search}%")
-                      ->orWhere('distributeur_id', 'LIKE', "%{$search}%");
-            })
-            ->limit(20)
-            ->get(['id', 'distributeur_id', 'nom_distributeur', 'pnom_distributeur']);
+        // Si la recherche est vide, retourner les 20 premiers distributeurs
+        $query = Distributeur::query();
 
+        if (!empty($search)) {
+            $query->where(function($q) use ($search) {
+                $q->where('nom_distributeur', 'LIKE', "%{$search}%")
+                  ->orWhere('pnom_distributeur', 'LIKE', "%{$search}%")
+                  ->orWhere('distributeur_id', 'LIKE', "%{$search}%")
+                  ->orWhere('tel_distributeur', 'LIKE', "%{$search}%");
+            });
+        }
+
+        $distributeurs = $query->orderBy('nom_distributeur')
+                              ->limit(20)
+                              ->get(['id', 'distributeur_id', 'nom_distributeur', 'pnom_distributeur', 'tel_distributeur']);
+
+        // Formater les résultats pour Select2/Ajax
         $results = $distributeurs->map(function($dist) {
             return [
                 'id' => $dist->id,
-                'text' => "{$dist->distributeur_id} - {$dist->pnom_distributeur} {$dist->nom_distributeur}"
+                'text' => "#{$dist->distributeur_id} - {$dist->pnom_distributeur} {$dist->nom_distributeur}",
+                'distributeur_id' => $dist->distributeur_id,
+                'nom_distributeur' => $dist->nom_distributeur,
+                'pnom_distributeur' => $dist->pnom_distributeur,
+                'tel_distributeur' => $dist->tel_distributeur
             ];
-        });
+        })->toArray();
 
-        return response()->json(['results' => $results]);
+        // Format attendu par Select2
+        return response()->json([
+            'results' => $results,
+            'pagination' => [
+                'more' => false
+            ]
+        ]);
     }
 
     /**

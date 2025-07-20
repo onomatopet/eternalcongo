@@ -10,6 +10,7 @@ use Illuminate\Http\Request;
 use Illuminate\View\View;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
 
 class AchatController extends Controller
@@ -64,17 +65,23 @@ class AchatController extends Controller
         // 6. Paginer avec statistiques
         $achats = $achatsQuery->paginate(20)->withQueryString();
 
-        // 7. Calculer les totaux pour la période sélectionnée
-        $totals = null;
+        // 7. Calculer les statistiques si période sélectionnée
+        $statistics = null;
         if ($selectedPeriod) {
-            $totals = [
+            $statistics = [
                 'total_achats' => Achat::where('period', $selectedPeriod)->count(),
                 'total_montant' => Achat::where('period', $selectedPeriod)->sum('montant_total_ligne'),
                 'total_points' => Achat::where('period', $selectedPeriod)->sum(DB::raw('points_unitaire_achat * qt')),
             ];
         }
 
-        return view('admin.achats.index', compact('achats', 'availablePeriods', 'selectedPeriod', 'searchTerm', 'totals'));
+        return view('admin.achats.index', compact(
+            'achats',
+            'availablePeriods',
+            'selectedPeriod',
+            'searchTerm',
+            'statistics'
+        ));
     }
 
     /**
@@ -82,11 +89,10 @@ class AchatController extends Controller
      */
     public function create(): View
     {
-        // Récupérer la période courante et les périodes disponibles
-        $currentPeriod = date('Y-m');
+        // Générer les périodes (12 derniers mois)
         $periods = $this->generatePeriods();
 
-        // Récupérer les produits actifs
+        // Récupérer tous les produits avec leur valeur en points
         $products = Product::with('pointValeur')
                            ->orderBy('nom_produit')
                            ->get()
@@ -95,11 +101,11 @@ class AchatController extends Controller
                                    'id' => $product->id,
                                    'name' => "{$product->nom_produit} ({$product->code_product})",
                                    'price' => $product->prix_product,
-                                   'points' => $product->pointValeur->numbers ?? 0
+                                   'points' => optional($product->pointValeur)->numbers ?? 0
                                ];
                            });
 
-        return view('admin.achats.create', compact('products', 'currentPeriod', 'periods'));
+        return view('admin.achats.create', compact('products', 'periods'));
     }
 
     /**
@@ -107,76 +113,66 @@ class AchatController extends Controller
      */
     public function store(Request $request): RedirectResponse
     {
-        // Validation avancée
+        // Validation
         $validatedData = $request->validate([
             'period' => [
                 'required',
                 'string',
                 'regex:/^\d{4}-\d{2}$/',
                 function ($attribute, $value, $fail) {
-                    // Empêcher les achats dans le futur
                     if ($value > date('Y-m')) {
                         $fail('La période ne peut pas être dans le futur.');
                     }
-                }
+                },
             ],
             'distributeur_id' => 'required|integer|exists:distributeurs,id',
             'products_id' => 'required|integer|exists:products,id',
-            'qt' => 'required|integer|min:1|max:9999',
+            'qt' => 'required|integer|min:1',
             'online' => 'boolean',
-        ], [
-            'period.required' => 'La période est obligatoire.',
-            'period.regex' => 'Le format de la période est invalide (AAAA-MM).',
-            'distributeur_id.required' => 'Le distributeur est obligatoire.',
-            'distributeur_id.exists' => 'Le distributeur sélectionné n\'existe pas.',
-            'products_id.required' => 'Le produit est obligatoire.',
-            'products_id.exists' => 'Le produit sélectionné n\'existe pas.',
-            'qt.required' => 'La quantité est obligatoire.',
-            'qt.min' => 'La quantité doit être au moins de 1.',
-            'qt.max' => 'La quantité ne peut pas dépasser 9999.',
         ]);
 
         DB::beginTransaction();
         try {
-            // Récupérer les infos du produit avec verrouillage
-            $product = Product::with('pointValeur')->lockForUpdate()->find($validatedData['products_id']);
-
-            if (!$product) {
-                throw new \Exception('Produit introuvable');
+            // CORRECTION : Vérification de l'existence du distributeur
+            $distributeur = Distributeur::find($validatedData['distributeur_id']);
+            if (!$distributeur) {
+                throw new \Exception("Le distributeur sélectionné n'existe pas.");
             }
 
-            // Calculer les valeurs
-            $points_unitaires = $product->pointValeur->numbers ?? 0;
+            // CORRECTION : Vérification de l'existence du produit
+            $product = Product::with('pointValeur')->find($validatedData['products_id']);
+            if (!$product) {
+                throw new \Exception("Le produit sélectionné n'existe pas.");
+            }
+
+            // Vérifier la valeur en points
+            if (!$product->pointValeur) {
+                throw new \Exception("Le produit n'a pas de valeur en points définie.");
+            }
+
+            // Calculer les valeurs dérivées
             $prix_unitaire = $product->prix_product;
+            $points_unitaire = $product->pointValeur->numbers;
             $montant_total = $prix_unitaire * $validatedData['qt'];
-            $points_total = $points_unitaires * $validatedData['qt'];
+
+            // Ajouter les valeurs calculées
+            $validatedData['prix_unitaire_achat'] = $prix_unitaire;
+            $validatedData['points_unitaire_achat'] = $points_unitaire;
+            $validatedData['montant_total_ligne'] = $montant_total;
+            $validatedData['online'] = $validatedData['online'] ?? false;
 
             // Créer l'achat
-            $achat = Achat::create([
-                'period' => $validatedData['period'],
-                'distributeur_id' => $validatedData['distributeur_id'],
-                'products_id' => $validatedData['products_id'],
-                'qt' => $validatedData['qt'],
-                'points_unitaire_achat' => $points_unitaires,
-                'montant_total_ligne' => $montant_total,
-                'prix_unitaire_achat' => $prix_unitaire,
-                'online' => $validatedData['online'] ?? false,
-            ]);
-
-            // Log de l'action
-            Log::info("Achat créé", [
-                'id' => $achat->id,
-                'distributeur_id' => $validatedData['distributeur_id'],
-                'produit' => $product->nom_produit,
-                'quantité' => $validatedData['qt'],
-                'montant' => $montant_total,
-                'points' => $points_total,
-                'created_by' => auth()->id()
-            ]);
+            $achat = Achat::create($validatedData);
 
             DB::commit();
+            Log::info("Nouvel achat créé", [
+                'id' => $achat->id,
+                'distributeur' => $distributeur->distributeur_id,
+                'montant' => $montant_total
+            ]);
+
             return redirect()
-                ->route('admin.achats.index')
+                ->route('admin.achats.show', $achat)
                 ->with('success', "Achat enregistré avec succès. Montant: " . number_format($montant_total, 0, ',', ' ') . " XAF");
 
         } catch (\Exception $e) {
@@ -187,7 +183,7 @@ class AchatController extends Controller
             ]);
             return back()
                 ->withInput()
-                ->with('error', 'Une erreur est survenue lors de l\'enregistrement de l\'achat.');
+                ->with('error', 'Une erreur est survenue lors de l\'enregistrement de l\'achat: ' . $e->getMessage());
         }
     }
 
@@ -199,10 +195,13 @@ class AchatController extends Controller
         $achat->load(['distributeur', 'product.category', 'product.pointValeur']);
 
         // Calculer les totaux du distributeur pour cette période
-        $distributeurStats = Achat::where('distributeur_id', $achat->distributeur_id)
-                                 ->where('period', $achat->period)
-                                 ->selectRaw('COUNT(*) as total_achats, SUM(montant_total_ligne) as total_montant, SUM(points_unitaire_achat * qt) as total_points')
-                                 ->first();
+        $distributeurStats = null;
+        if ($achat->distributeur) {
+            $distributeurStats = Achat::where('distributeur_id', $achat->distributeur_id)
+                                     ->where('period', $achat->period)
+                                     ->selectRaw('COUNT(*) as total_achats, SUM(montant_total_ligne) as total_montant, SUM(points_unitaire_achat * qt) as total_points')
+                                     ->first();
+        }
 
         return view('admin.achats.show', compact('achat', 'distributeurStats'));
     }
@@ -223,7 +222,7 @@ class AchatController extends Controller
                                    'id' => $product->id,
                                    'name' => "{$product->nom_produit} ({$product->code_product})",
                                    'price' => $product->prix_product,
-                                   'points' => $product->pointValeur->numbers ?? 0
+                                   'points' => optional($product->pointValeur)->numbers ?? 0
                                ];
                            });
 
@@ -248,60 +247,73 @@ class AchatController extends Controller
                     if ($value > date('Y-m')) {
                         $fail('La période ne peut pas être dans le futur.');
                     }
-                }
+                },
             ],
             'distributeur_id' => 'required|integer|exists:distributeurs,id',
             'products_id' => 'required|integer|exists:products,id',
-            'qt' => 'required|integer|min:1|max:9999',
+            'qt' => 'required|integer|min:1',
             'online' => 'boolean',
         ]);
 
         DB::beginTransaction();
         try {
-            // Récupérer les infos du produit
-            $product = Product::with('pointValeur')->find($validatedData['products_id']);
+            // CORRECTION : Vérification de l'existence du distributeur
+            $distributeur = Distributeur::find($validatedData['distributeur_id']);
+            if (!$distributeur) {
+                throw new \Exception("Le distributeur sélectionné n'existe pas.");
+            }
 
-            // Recalculer les valeurs
-            $points_unitaires = $product->pointValeur->numbers ?? 0;
+            // CORRECTION : Vérification de l'existence du produit
+            $product = Product::with('pointValeur')->find($validatedData['products_id']);
+            if (!$product) {
+                throw new \Exception("Le produit sélectionné n'existe pas.");
+            }
+
+            // Vérifier la valeur en points
+            if (!$product->pointValeur) {
+                throw new \Exception("Le produit n'a pas de valeur en points définie.");
+            }
+
+            // Calculer les nouvelles valeurs
             $prix_unitaire = $product->prix_product;
+            $points_unitaire = $product->pointValeur->numbers;
             $montant_total = $prix_unitaire * $validatedData['qt'];
 
-            // Sauvegarder les anciennes valeurs pour le log
-            $oldData = $achat->toArray();
+            // Ajouter les valeurs calculées
+            $validatedData['prix_unitaire_achat'] = $prix_unitaire;
+            $validatedData['points_unitaire_achat'] = $points_unitaire;
+            $validatedData['montant_total_ligne'] = $montant_total;
+            $validatedData['online'] = $validatedData['online'] ?? false;
+
+            // Log changements importants
+            if ($achat->products_id != $validatedData['products_id'] ||
+                $achat->qt != $validatedData['qt']) {
+                Log::info("Modification achat", [
+                    'id' => $achat->id,
+                    'ancien_produit' => $achat->products_id,
+                    'nouveau_produit' => $validatedData['products_id'],
+                    'ancienne_qt' => $achat->qt,
+                    'nouvelle_qt' => $validatedData['qt'],
+                ]);
+            }
 
             // Mettre à jour
-            $achat->update([
-                'period' => $validatedData['period'],
-                'distributeur_id' => $validatedData['distributeur_id'],
-                'products_id' => $validatedData['products_id'],
-                'qt' => $validatedData['qt'],
-                'points_unitaire_achat' => $points_unitaires,
-                'montant_total_ligne' => $montant_total,
-                'prix_unitaire_achat' => $prix_unitaire,
-                'online' => $validatedData['online'] ?? false,
-            ]);
-
-            Log::info("Achat modifié", [
-                'id' => $achat->id,
-                'old_data' => $oldData,
-                'new_data' => $achat->toArray(),
-                'updated_by' => auth()->id()
-            ]);
+            $achat->update($validatedData);
 
             DB::commit();
             return redirect()
-                ->route('admin.achats.index')
-                ->with('success', 'Achat modifié avec succès.');
+                ->route('admin.achats.show', $achat)
+                ->with('success', 'Achat mis à jour avec succès.');
 
         } catch (\Exception $e) {
             DB::rollBack();
-            Log::error("Erreur modification achat", [
+            Log::error("Erreur mise à jour achat", [
                 'id' => $achat->id,
                 'error' => $e->getMessage()
             ]);
             return back()
                 ->withInput()
-                ->with('error', 'Une erreur est survenue lors de la modification.');
+                ->with('error', 'Erreur lors de la mise à jour: ' . $e->getMessage());
         }
     }
 
@@ -312,11 +324,10 @@ class AchatController extends Controller
     {
         DB::beginTransaction();
         try {
-            // Log avant suppression
-            Log::info("Achat supprimé", [
+            Log::info("Suppression achat", [
                 'id' => $achat->id,
-                'data' => $achat->toArray(),
-                'deleted_by' => auth()->id()
+                'distributeur' => optional($achat->distributeur)->distributeur_id,
+                'montant' => $achat->montant_total_ligne
             ]);
 
             $achat->delete();
@@ -332,12 +343,12 @@ class AchatController extends Controller
                 'id' => $achat->id,
                 'error' => $e->getMessage()
             ]);
-            return back()->with('error', 'Une erreur est survenue lors de la suppression.');
+            return back()->with('error', 'Erreur lors de la suppression.');
         }
     }
 
     /**
-     * Générer une liste de périodes
+     * Générer les périodes pour les formulaires
      */
     private function generatePeriods(): array
     {
@@ -351,5 +362,27 @@ class AchatController extends Controller
         }
 
         return $periods;
+    }
+
+    /**
+     * Obtenir les produits en JSON pour AJAX
+     */
+    public function getProductInfo(Request $request): \Illuminate\Http\JsonResponse
+    {
+        $productId = $request->get('product_id');
+
+        $product = Product::with('pointValeur')->find($productId);
+
+        if (!$product) {
+            return response()->json(['error' => 'Produit non trouvé'], 404);
+        }
+
+        return response()->json([
+            'id' => $product->id,
+            'name' => $product->nom_produit,
+            'code' => $product->code_product,
+            'price' => $product->prix_product,
+            'points' => optional($product->pointValeur)->numbers ?? 0,
+        ]);
     }
 }
