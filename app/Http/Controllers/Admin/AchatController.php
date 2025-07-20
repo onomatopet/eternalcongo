@@ -76,29 +76,25 @@ class AchatController extends Controller
             'searchTerm' => $searchTerm
         ]);
     }
-
+    
     /**
      * Show the form for creating a new resource.
+     * Mise à jour pour ne plus charger tous les distributeurs
      */
     public function create(): View
     {
-        // Récupérer et formater les distributeurs
-        $distributeurs = Distributeur::orderBy('nom_distributeur')
-                                      ->select('id', 'distributeur_id', 'nom_distributeur', 'pnom_distributeur')
-                                      ->get()
-                                      ->mapWithKeys(function ($distributeur) {
-                                          return [$distributeur->id => "#{$distributeur->distributeur_id} - {$distributeur->pnom_distributeur} {$distributeur->nom_distributeur}"];
-                                      });
+        // Ne plus charger les 8500 distributeurs !
+        // La recherche AJAX s'en occupe
 
-        // Récupérer et formater les produits
+        // Charger uniquement les produits (généralement moins nombreux)
         $products = Product::orderBy('nom_produit')
                            ->select('id', 'code_product', 'nom_produit')
                            ->get()
                            ->mapWithKeys(function ($product) {
-                               return [$product->id => "{$product->nom_produit} ({$product->code_product})"];
+                                return [$product->id => "{$product->nom_produit} ({$product->code_product})"];
                            });
 
-        return view('admin.achats.create', compact('distributeurs', 'products'));
+        return view('admin.achats.create', compact('products'));
     }
 
     /**

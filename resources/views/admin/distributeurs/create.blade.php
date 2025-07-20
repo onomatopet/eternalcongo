@@ -1,242 +1,445 @@
+{{-- resources/views/admin/distributeurs/create.blade.php --}}
+
 @extends('layouts.admin')
 
+@section('title', 'Ajouter un Distributeur')
+
 @section('content')
-<!-- Header -->
-<div class="md:flex md:items-center md:justify-between">
-    <div class="min-w-0 flex-1">
-        <h2 class="text-2xl font-bold leading-7 text-gray-900 sm:truncate sm:text-3xl sm:tracking-tight">
-            Ajouter un distributeur
-        </h2>
-        <div class="mt-1 flex flex-col sm:mt-0 sm:flex-row sm:flex-wrap sm:space-x-6">
-            <div class="mt-2 flex items-center text-sm text-gray-500">
-                <svg class="mr-1.5 h-5 w-5 flex-shrink-0 text-gray-400" viewBox="0 0 20 20" fill="currentColor">
-                    <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-6-3a2 2 0 11-4 0 2 2 0 014 0zm-2 4a5 5 0 00-4.546 2.916A5.986 5.986 0 0010 16a5.986 5.986 0 004.546-2.084A5 5 0 0010 11z" clip-rule="evenodd" />
-                </svg>
-                Nouveau membre du réseau
-            </div>
-        </div>
-    </div>
-    <div class="mt-4 flex md:ml-4 md:mt-0">
-        <a href="{{ route('admin.distributeurs.index') }}" class="inline-flex items-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50">
-            <svg class="-ml-0.5 mr-1.5 h-5 w-5 text-gray-400" viewBox="0 0 20 20" fill="currentColor">
-                <path fill-rule="evenodd" d="M7.72 12.53a.75.75 0 010-1.06L10.94 8 7.72 4.47a.75.75 0 011.06-1.06l4 4a.75.75 0 010 1.06l-4 4a.75.75 0 01-1.06 0z" clip-rule="evenodd" />
-            </svg>
-            Retour à la liste
-        </a>
-    </div>
-</div>
-
-<!-- Messages d'erreur -->
-@if($errors->any())
-    <div class="mt-6 rounded-md bg-red-50 p-4">
-        <div class="flex">
-            <div class="flex-shrink-0">
-                <svg class="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
-                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.28 7.22a.75.75 0 00-1.06 1.06L8.94 10l-1.72 1.72a.75.75 0 101.06 1.06L10 11.06l1.72 1.72a.75.75 0 101.06-1.06L11.06 10l1.72-1.72a.75.75 0 00-1.06-1.06L10 8.94 8.28 7.22z" clip-rule="evenodd" />
-                </svg>
-            </div>
-            <div class="ml-3">
-                <h3 class="text-sm font-medium text-red-800">Veuillez corriger les erreurs suivantes :</h3>
-                <div class="mt-2 text-sm text-red-700">
-                    <ul role="list" class="list-disc space-y-1 pl-5">
-                        @foreach($errors->all() as $error)
-                            <li>{{ $error }}</li>
-                        @endforeach
-                    </ul>
-                </div>
-            </div>
-        </div>
-    </div>
-@endif
-
-@if(session('error'))
-    <div class="mt-6 rounded-md bg-red-50 p-4">
-        <div class="flex">
-            <div class="flex-shrink-0">
-                <svg class="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
-                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.28 7.22a.75.75 0 00-1.06 1.06L8.94 10l-1.72 1.72a.75.75 0 101.06 1.06L10 11.06l1.72 1.72a.75.75 0 101.06-1.06L11.06 10l1.72-1.72a.75.75 0 00-1.06-1.06L10 8.94 8.28 7.22z" clip-rule="evenodd" />
-                </svg>
-            </div>
-            <div class="ml-3">
-                <p class="text-sm font-medium text-red-800">{{ session('error') }}</p>
-            </div>
-        </div>
-    </div>
-@endif
-
-<!-- Formulaire -->
-<div class="mt-8 bg-white shadow-sm ring-1 ring-gray-900/5 sm:rounded-xl">
-    <form method="POST" action="{{ route('admin.distributeurs.store') }}" class="px-4 py-6 sm:p-8">
-        @csrf
-    
-    <div class="space-y-12">
-        <!-- Informations personnelles -->
-        <div class="border-b border-gray-900/10 pb-12">
-            <h2 class="text-base font-semibold leading-7 text-gray-900">Informations personnelles</h2>
-            <p class="mt-1 text-sm leading-6 text-gray-600">Ces informations seront visibles dans le système.</p>
-
-            <div class="mt-10 grid grid-cols-1 gap-x-6 gap-y-8 sm:grid-cols-6">
-                <!-- Matricule -->
-                <div class="sm:col-span-2">
-                    <label for="distributeur_id" class="block text-sm font-medium leading-6 text-gray-900">
-                        Matricule <span class="text-red-500">*</span>
-                    </label>
-                    <div class="mt-2">
-                        <input type="number" name="distributeur_id" id="distributeur_id" value="{{ old('distributeur_id') }}" required
-                               class="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6 @error('distributeur_id') ring-red-500 @enderror">
-                        @error('distributeur_id')
-                            <p class="mt-2 text-sm text-red-600">{{ $message }}</p>
-                        @enderror
-                    </div>
-                </div>
-
-                <!-- Prénom -->
-                <div class="sm:col-span-2">
-                    <label for="pnom_distributeur" class="block text-sm font-medium leading-6 text-gray-900">
-                        Prénom <span class="text-red-500">*</span>
-                    </label>
-                    <div class="mt-2">
-                        <input type="text" name="pnom_distributeur" id="pnom_distributeur" value="{{ old('pnom_distributeur') }}" required
-                               class="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6 @error('pnom_distributeur') ring-red-500 @enderror">
-                        @error('pnom_distributeur')
-                            <p class="mt-2 text-sm text-red-600">{{ $message }}</p>
-                        @enderror
-                    </div>
-                </div>
-
-                <!-- Nom -->
-                <div class="sm:col-span-2">
-                    <label for="nom_distributeur" class="block text-sm font-medium leading-6 text-gray-900">
-                        Nom <span class="text-red-500">*</span>
-                    </label>
-                    <div class="mt-2">
-                        <input type="text" name="nom_distributeur" id="nom_distributeur" value="{{ old('nom_distributeur') }}" required
-                               class="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6 @error('nom_distributeur') ring-red-500 @enderror">
-                        @error('nom_distributeur')
-                            <p class="mt-2 text-sm text-red-600">{{ $message }}</p>
-                        @enderror
-                    </div>
-                </div>
-
-                <!-- Téléphone -->
-                <div class="sm:col-span-3">
-                    <label for="tel_distributeur" class="block text-sm font-medium leading-6 text-gray-900">Téléphone</label>
-                    <div class="mt-2">
-                        <input type="tel" name="tel_distributeur" id="tel_distributeur" value="{{ old('tel_distributeur') }}"
-                               class="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6 @error('tel_distributeur') ring-red-500 @enderror"
-                               placeholder="06 12 34 56 78">
-                        @error('tel_distributeur')
-                            <p class="mt-2 text-sm text-red-600">{{ $message }}</p>
-                        @enderror
-                    </div>
-                </div>
-
-                <!-- Adresse -->
-                <div class="sm:col-span-6">
-                    <label for="adress_distributeur" class="block text-sm font-medium leading-6 text-gray-900">Adresse</label>
-                    <div class="mt-2">
-                        <textarea name="adress_distributeur" id="adress_distributeur" rows="3"
-                                  class="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6 @error('adress_distributeur') ring-red-500 @enderror"
-                                  placeholder="Adresse complète du distributeur">{{ old('adress_distributeur') }}</textarea>
-                        @error('adress_distributeur')
-                            <p class="mt-2 text-sm text-red-600">{{ $message }}</p>
-                        @enderror
-                    </div>
-                </div>
-            </div>
+<div class="min-h-screen bg-gray-50 py-8">
+    <div class="px-4 sm:px-6 lg:px-8">
+        {{-- En-tête avec fil d'Ariane --}}
+        <div class="bg-white rounded-lg shadow-sm px-6 py-4 mb-6">
+            <nav class="flex items-center text-sm">
+                <a href="{{ route('admin.dashboard') }}" class="text-gray-500 hover:text-gray-700 transition-colors duration-200">
+                    <svg class="w-4 h-4 mr-1 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/>
+                    </svg>
+                    Tableau de Bord
+                </a>
+                <span class="mx-2 text-gray-400">/</span>
+                <a href="{{ route('admin.distributeurs.index') }}" class="text-gray-500 hover:text-gray-700 transition-colors duration-200">
+                    Distributeurs
+                </a>
+                <span class="mx-2 text-gray-400">/</span>
+                <span class="text-gray-700 font-medium">Nouveau Distributeur</span>
+            </nav>
         </div>
 
-        <!-- Informations MLM -->
-        <div class="border-b border-gray-900/10 pb-12">
-            <h2 class="text-base font-semibold leading-7 text-gray-900">Configuration MLM</h2>
-            <p class="mt-1 text-sm leading-6 text-gray-600">Paramètres du réseau de distribution et hiérarchie.</p>
+        {{-- Titre principal --}}
+        <div class="mb-8">
+            <h1 class="text-3xl font-bold text-gray-900">Ajouter un nouveau distributeur</h1>
+            <p class="mt-2 text-gray-600">Remplissez le formulaire ci-dessous pour créer un nouveau distributeur dans le système.</p>
+        </div>
 
-            <div class="mt-10 grid grid-cols-1 gap-x-6 gap-y-8 sm:grid-cols-6">
-                <!-- Parent -->
-                <div class="sm:col-span-4">
-                    <label for="id_distrib_parent" class="block text-sm font-medium leading-6 text-gray-900">Distributeur parent</label>
-                    <div class="mt-2">
-                        <select name="id_distrib_parent" id="id_distrib_parent" 
-                                class="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6 @error('id_distrib_parent') ring-red-500 @enderror">
-                            <option value="">Aucun parent (distributeur racine)</option>
-                            @foreach($potentialParents as $id => $displayName)
-                                <option value="{{ $id }}" {{ old('id_distrib_parent') == $id ? 'selected' : '' }}>
-                                    {{ $displayName }}
-                                </option>
-                            @endforeach
-                        </select>
+        {{-- Affichage des erreurs --}}
+        @if ($errors->any())
+            <div class="bg-red-50 border-l-4 border-red-400 p-4 mb-6 rounded-lg">
+                <div class="flex">
+                    <div class="flex-shrink-0">
+                        <svg class="h-5 w-5 text-red-400" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"/>
+                        </svg>
+                    </div>
+                    <div class="ml-3">
+                        <h3 class="text-sm font-medium text-red-800">Des erreurs ont été détectées :</h3>
+                        <div class="mt-2 text-sm text-red-700">
+                            <ul class="list-disc pl-5 space-y-1">
+                                @foreach ($errors->all() as $error)
+                                    <li>{{ $error }}</li>
+                                @endforeach
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        @endif
+
+        {{-- Formulaire principal --}}
+        <form method="POST" action="{{ route('admin.distributeurs.store') }}" class="space-y-8">
+            @csrf
+
+            {{-- Sections côte à côte sur grand écran --}}
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {{-- Section Informations personnelles --}}
+                <div class="bg-white shadow-lg rounded-lg overflow-hidden h-fit">
+                    <div class="bg-gradient-to-r from-blue-500 to-blue-600 px-6 py-4">
+                        <h2 class="text-xl font-semibold text-white flex items-center">
+                            <svg class="w-6 h-6 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
+                            </svg>
+                            Informations personnelles
+                        </h2>
+                    </div>
+                    <div class="p-6 space-y-6">
+                        <div class="space-y-6">
+                            {{-- Prénom --}}
+                            <div>
+                                <label for="pnom_distributeur" class="block text-sm font-medium text-gray-700 mb-2">
+                                    Prénom <span class="text-red-500">*</span>
+                                </label>
+                                <input
+                                    type="text"
+                                    name="pnom_distributeur"
+                                    id="pnom_distributeur"
+                                    value="{{ old('pnom_distributeur') }}"
+                                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200 @error('pnom_distributeur') border-red-500 @enderror"
+                                    placeholder="Entrez le prénom"
+                                    required
+                                >
+                                @error('pnom_distributeur')
+                                    <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
+                                @enderror
+                            </div>
+
+                            {{-- Nom --}}
+                            <div>
+                                <label for="nom_distributeur" class="block text-sm font-medium text-gray-700 mb-2">
+                                    Nom <span class="text-red-500">*</span>
+                                </label>
+                                <input
+                                    type="text"
+                                    name="nom_distributeur"
+                                    id="nom_distributeur"
+                                    value="{{ old('nom_distributeur') }}"
+                                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200 @error('nom_distributeur') border-red-500 @enderror"
+                                    placeholder="Entrez le nom"
+                                    required
+                                >
+                                @error('nom_distributeur')
+                                    <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
+                                @enderror
+                            </div>
+
+                            {{-- Matricule --}}
+                            <div>
+                                <label for="distributeur_id" class="block text-sm font-medium text-gray-700 mb-2">
+                                    Matricule <span class="text-red-500">*</span>
+                                </label>
+                                <div class="relative">
+                                    <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                        <span class="text-gray-500 sm:text-sm">#</span>
+                                    </div>
+                                    <input
+                                        type="text"
+                                        name="distributeur_id"
+                                        id="distributeur_id"
+                                        value="{{ old('distributeur_id') }}"
+                                        class="w-full pl-8 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200 @error('distributeur_id') border-red-500 @enderror"
+                                        placeholder="Ex: 12345"
+                                        required
+                                    >
+                                </div>
+                                @error('distributeur_id')
+                                    <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
+                                @enderror
+                            </div>
+
+                            {{-- Téléphone --}}
+                            <div>
+                                <label for="tel_distributeur" class="block text-sm font-medium text-gray-700 mb-2">
+                                    Téléphone
+                                </label>
+                                <input
+                                    type="tel"
+                                    name="tel_distributeur"
+                                    id="tel_distributeur"
+                                    value="{{ old('tel_distributeur') }}"
+                                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200 @error('tel_distributeur') border-red-500 @enderror"
+                                    placeholder="Ex: +242 06 XXX XX XX"
+                                >
+                                @error('tel_distributeur')
+                                    <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
+                                @enderror
+                            </div>
+
+                            {{-- Adresse --}}
+                            <div>
+                                <label for="adress_distributeur" class="block text-sm font-medium text-gray-700 mb-2">
+                                    Adresse
+                                </label>
+                                <textarea
+                                    name="adress_distributeur"
+                                    id="adress_distributeur"
+                                    rows="3"
+                                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200 @error('adress_distributeur') border-red-500 @enderror"
+                                    placeholder="Entrez l'adresse complète"
+                                >{{ old('adress_distributeur') }}</textarea>
+                                @error('adress_distributeur')
+                                    <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
+                                @enderror
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {{-- Section Parrainage et Niveau --}}
+                <div class="bg-white shadow-lg rounded-lg overflow-hidden h-fit">
+                    <div class="bg-gradient-to-r from-green-500 to-green-600 px-6 py-4">
+                        <h2 class="text-xl font-semibold text-white flex items-center">
+                            <svg class="w-6 h-6 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/>
+                            </svg>
+                            Parrainage et Niveau
+                        </h2>
+                    </div>
+                    <div class="p-6 space-y-6">
+                    {{-- Parent (Sponsor) avec recherche AJAX --}}
+                    <div>
+                        <label for="parent_search" class="block text-sm font-medium text-gray-700 mb-2">
+                            Parent / Sponsor
+                        </label>
+
+                        {{-- Champ de recherche --}}
+                        <div class="relative">
+                            <input
+                                type="text"
+                                id="parent_search"
+                                placeholder="Rechercher par matricule, nom ou prénom..."
+                                class="w-full px-4 py-2 pr-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200"
+                                autocomplete="off"
+                            >
+                            <div class="absolute inset-y-0 right-0 pr-3 flex items-center">
+                                <svg class="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                                </svg>
+                            </div>
+                        </div>
+
+                        {{-- Champ caché pour l'ID du parent --}}
+                        <input
+                            type="hidden"
+                            name="id_distrib_parent"
+                            id="id_distrib_parent"
+                            value="{{ old('id_distrib_parent') }}"
+                        >
+
+                        {{-- Affichage du parent sélectionné --}}
+                        <div id="selected_parent" class="mt-2 p-3 bg-blue-50 rounded-lg hidden">
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <p class="text-sm font-medium text-blue-900">Parent sélectionné :</p>
+                                    <p id="parent_display" class="text-sm text-blue-700"></p>
+                                </div>
+                                <button type="button" onclick="clearParent()" class="text-blue-600 hover:text-blue-800">
+                                    <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+
+                        {{-- Liste des résultats de recherche --}}
+                        <div id="search_results" class="absolute z-10 w-full mt-1 bg-white rounded-lg shadow-lg hidden max-h-60 overflow-y-auto">
+                            <!-- Les résultats seront ajoutés ici via JavaScript -->
+                        </div>
+
                         @error('id_distrib_parent')
-                            <p class="mt-2 text-sm text-red-600">{{ $message }}</p>
+                            <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
                         @enderror
-                        <p class="mt-2 text-sm text-gray-500">Sélectionnez le distributeur qui parraine cette personne</p>
+                        <p class="mt-2 text-sm text-gray-500">
+                            Commencez à taper pour rechercher un distributeur parent. Laissez vide pour un distributeur racine.
+                        </p>
                     </div>
-                </div>
 
-                <!-- Niveau étoiles -->
-                <div class="sm:col-span-2">
-                    <label for="etoiles_id" class="block text-sm font-medium leading-6 text-gray-900">
-                        Niveau d'étoiles <span class="text-red-500">*</span>
-                    </label>
-                    <div class="mt-2">
-                        <select name="etoiles_id" id="etoiles_id" required
-                                class="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6 @error('etoiles_id') ring-red-500 @enderror">
-                            <option value="1" {{ old('etoiles_id', 1) == 1 ? 'selected' : '' }}>⭐ 1 étoile</option>
-                            <option value="2" {{ old('etoiles_id') == 2 ? 'selected' : '' }}>⭐⭐ 2 étoiles</option>
-                            <option value="3" {{ old('etoiles_id') == 3 ? 'selected' : '' }}>⭐⭐⭐ 3 étoiles</option>
-                            <option value="4" {{ old('etoiles_id') == 4 ? 'selected' : '' }}>⭐⭐⭐⭐ 4 étoiles</option>
-                            <option value="5" {{ old('etoiles_id') == 5 ? 'selected' : '' }}>⭐⭐⭐⭐⭐ 5 étoiles</option>
-                        </select>
-                        @error('etoiles_id')
-                            <p class="mt-2 text-sm text-red-600">{{ $message }}</p>
-                        @enderror
-                    </div>
-                </div>
-
-                <!-- Rang -->
-                <div class="sm:col-span-2">
-                    <label for="rang" class="block text-sm font-medium leading-6 text-gray-900">
-                        Rang initial
-                    </label>
-                    <div class="mt-2">
-                        <input type="number" name="rang" id="rang" value="{{ old('rang', 0) }}" min="0"
-                               class="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6 @error('rang') ring-red-500 @enderror">
-                        @error('rang')
-                            <p class="mt-2 text-sm text-red-600">{{ $message }}</p>
-                        @enderror
-                        <p class="mt-2 text-sm text-gray-500">Par défaut : 0 pour un nouveau distributeur (optionnel)</p>
-                    </div>
-                </div>
-
-                <!-- Statut période -->
-                <div class="sm:col-span-6">
-                    <div class="relative flex items-start">
-                        <div class="flex h-6 items-center">
-                            <input id="statut_validation_periode" name="statut_validation_periode" type="checkbox" value="1" {{ old('statut_validation_periode') ? 'checked' : '' }}
-                                   class="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-600">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        {{-- Niveau (Étoiles) --}}
+                        <div>
+                            <label for="etoiles_id" class="block text-sm font-medium text-gray-700 mb-2">
+                                Niveau (Étoiles) <span class="text-red-500">*</span>
+                            </label>
+                            <select
+                                name="etoiles_id"
+                                id="etoiles_id"
+                                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200 @error('etoiles_id') border-red-500 @enderror"
+                                required
+                            >
+                                @for($i = 1; $i <= 10; $i++)
+                                    <option value="{{ $i }}" {{ old('etoiles_id', 1) == $i ? 'selected' : '' }}>
+                                        {{ $i }} étoile{{ $i > 1 ? 's' : '' }}
+                                    </option>
+                                @endfor
+                            </select>
+                            @error('etoiles_id')
+                                <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
+                            @enderror
                         </div>
-                        <div class="ml-3 text-sm leading-6">
-                            <label for="statut_validation_periode" class="font-medium text-gray-900">Période validée</label>
-                            <p class="text-gray-500">Cocher si la période courante est déjà validée pour ce distributeur</p>
+
+                        {{-- Rang --}}
+                        <div>
+                            <label for="rang" class="block text-sm font-medium text-gray-700 mb-2">
+                                Rang
+                            </label>
+                            <input
+                                type="number"
+                                name="rang"
+                                id="rang"
+                                value="{{ old('rang', 0) }}"
+                                min="0"
+                                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200 @error('rang') border-red-500 @enderror"
+                            >
+                            @error('rang')
+                                <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
+                            @enderror
                         </div>
                     </div>
-                    @error('statut_validation_periode')
-                        <p class="mt-2 text-sm text-red-600">{{ $message }}</p>
-                    @enderror
+
+                        {{-- Statut de validation --}}
+                        <div>
+                            <label class="flex items-center">
+                                <input
+                                    type="checkbox"
+                                    name="statut_validation_periode"
+                                    value="1"
+                                    {{ old('statut_validation_periode', 0) ? 'checked' : '' }}
+                                    class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded transition duration-200"
+                                >
+                                <span class="ml-2 text-sm text-gray-700">
+                                    Statut de validation période actif
+                                </span>
+                            </label>
+                            @error('statut_validation_periode')
+                                <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
+                            @enderror
+                        </div>
+                    </div>
                 </div>
             </div>
-        </div>
-    </div>
 
-    <!-- Actions -->
-    <div class="mt-6 flex items-center justify-end gap-x-6 border-t border-gray-900/10 px-4 py-4 sm:px-8">
-        <a href="{{ route('admin.distributeurs.index') }}" class="text-sm font-semibold leading-6 text-gray-900">Annuler</a>
-        <button type="submit" class="rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600">
-            <svg class="-ml-0.5 mr-1.5 h-5 w-5 inline" viewBox="0 0 20 20" fill="currentColor">
-                <path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd" />
-            </svg>
-            Enregistrer le distributeur
-        </button>
+            {{-- Boutons d'action --}}
+            <div class="flex items-center justify-end space-x-4 pt-4">
+                <a href="{{ route('admin.distributeurs.index') }}" class="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors duration-200">
+                    Annuler
+                </a>
+                <button type="submit" class="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors duration-200">
+                    <svg class="w-5 h-5 mr-2 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                    </svg>
+                    Créer le distributeur
+                </button>
+            </div>
+        </form>
     </div>
-    </form>
 </div>
+
+{{-- Script pour la recherche AJAX du parent --}}
+@push('scripts')
+<script>
+    let searchTimeout;
+    const searchInput = document.getElementById('parent_search');
+    const searchResults = document.getElementById('search_results');
+    const selectedParentDiv = document.getElementById('selected_parent');
+    const parentDisplay = document.getElementById('parent_display');
+    const parentIdInput = document.getElementById('id_distrib_parent');
+
+    // Gestion de la recherche
+    searchInput.addEventListener('input', function() {
+        clearTimeout(searchTimeout);
+        const query = this.value.trim();
+
+        if (query.length < 2) {
+            searchResults.classList.add('hidden');
+            searchResults.innerHTML = '';
+            return;
+        }
+
+        // Afficher un loader
+        searchResults.innerHTML = `
+            <div class="p-4 text-center">
+                <svg class="animate-spin h-5 w-5 mx-auto text-gray-500" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                <p class="mt-2 text-sm text-gray-500">Recherche en cours...</p>
+            </div>
+        `;
+        searchResults.classList.remove('hidden');
+
+        // Délai avant la recherche pour éviter trop de requêtes
+        searchTimeout = setTimeout(() => {
+            searchDistributeurs(query);
+        }, 300);
+    });
+
+    // Fonction de recherche AJAX
+    function searchDistributeurs(query) {
+        fetch(`{{ route('admin.distributeurs.search') }}?q=${encodeURIComponent(query)}`, {
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest',
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            searchResults.innerHTML = '';
+
+            if (data.length === 0) {
+                searchResults.innerHTML = `
+                    <div class="p-4 text-center text-gray-500">
+                        Aucun distributeur trouvé
+                    </div>
+                `;
+            } else {
+                data.forEach(distributeur => {
+                    const item = document.createElement('div');
+                    item.className = 'px-4 py-3 hover:bg-gray-50 cursor-pointer border-b last:border-b-0';
+                    item.innerHTML = `
+                        <div class="font-medium text-gray-900">
+                            #${distributeur.distributeur_id} - ${distributeur.pnom_distributeur} ${distributeur.nom_distributeur}
+                        </div>
+                        ${distributeur.tel_distributeur ? `<div class="text-sm text-gray-500">${distributeur.tel_distributeur}</div>` : ''}
+                    `;
+                    item.addEventListener('click', () => selectParent(distributeur));
+                    searchResults.appendChild(item);
+                });
+            }
+        })
+        .catch(error => {
+            searchResults.innerHTML = `
+                <div class="p-4 text-center text-red-500">
+                    Erreur lors de la recherche
+                </div>
+            `;
+        });
+    }
+
+    // Sélectionner un parent
+    function selectParent(distributeur) {
+        parentIdInput.value = distributeur.id;
+        parentDisplay.textContent = `#${distributeur.distributeur_id} - ${distributeur.pnom_distributeur} ${distributeur.nom_distributeur}`;
+        selectedParentDiv.classList.remove('hidden');
+        searchInput.value = '';
+        searchResults.classList.add('hidden');
+        searchResults.innerHTML = '';
+    }
+
+    // Effacer la sélection
+    function clearParent() {
+        parentIdInput.value = '';
+        selectedParentDiv.classList.add('hidden');
+        searchInput.value = '';
+    }
+
+    // Fermer les résultats quand on clique ailleurs
+    document.addEventListener('click', function(e) {
+        if (!searchInput.contains(e.target) && !searchResults.contains(e.target)) {
+            searchResults.classList.add('hidden');
+        }
+    });
+
+    // Si un parent était sélectionné (old value), l'afficher
+    @if(old('id_distrib_parent'))
+        // Vous devrez faire une requête pour récupérer les infos du parent
+        fetch(`{{ route('admin.distributeurs.show', old('id_distrib_parent')) }}`, {
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest',
+            }
+        })
+        .then(response => response.json())
+        .then(distributeur => {
+            selectParent(distributeur);
+        });
+    @endif
+</script>
+@endpush
+
 @endsection

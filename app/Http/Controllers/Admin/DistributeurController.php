@@ -8,6 +8,7 @@ use Illuminate\Http\Request;
 use Illuminate\View\View;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\JsonResponse;
 
 class DistributeurController extends Controller
 {
@@ -47,46 +48,78 @@ class DistributeurController extends Controller
     }
 
     /**
-     * Show the form for creating a new resource.
+     * Recherche AJAX de distributeurs
+     * Utilisée pour le champ de recherche du parent dans le formulaire de création
+     *
+     * @param Request $request
+     * @return JsonResponse
      */
-    public function create(): View
+    public function search(Request $request): JsonResponse
     {
-        // Récupérer les parents potentiels
-        $potentialParents = Distributeur::orderBy('nom_distributeur')
-                                      ->select('id', 'distributeur_id', 'nom_distributeur', 'pnom_distributeur')
-                                      ->limit(1000)
-                                      ->get()
-                                      ->mapWithKeys(function ($item) {
-                                          return [$item->id => "#{$item->distributeur_id} - {$item->pnom_distributeur} {$item->nom_distributeur}"];
-                                      });
+        $query = $request->get('q', '');
 
-        return view('admin.distributeurs.create', compact('potentialParents'));
+        // Ne rechercher que si la requête a au moins 2 caractères
+        if (strlen($query) < 2) {
+            return response()->json([]);
+        }
+
+        // Rechercher les distributeurs
+        $distributeurs = Distributeur::where(function ($q) use ($query) {
+                $q->where('nom_distributeur', 'LIKE', "%{$query}%")
+                  ->orWhere('pnom_distributeur', 'LIKE', "%{$query}%")
+                  ->orWhere('distributeur_id', 'LIKE', "%{$query}%")
+                  ->orWhere('tel_distributeur', 'LIKE', "%{$query}%");
+            })
+            ->select('id', 'distributeur_id', 'nom_distributeur', 'pnom_distributeur', 'tel_distributeur')
+            ->orderBy('nom_distributeur')
+            ->limit(20) // Limiter à 20 résultats pour la performance
+            ->get();
+
+        // Retourner les résultats en JSON
+        return response()->json($distributeurs);
     }
 
     /**
-     * Store a newly created resource in storage.
+     * Modifiez la méthode create existante
+     * Plus besoin de charger tous les parents potentiels
      */
+    public function create(): View
+    {
+        // Ne plus charger les 8500 distributeurs !
+        // La recherche AJAX s'en occupe
+        return view('admin.distributeurs.create');
+    }
+
+    /**
+    * Store a newly created resource in storage.
+    * Traite la soumission du formulaire d'ajout de distributeur.
+    * @param  \Illuminate\Http\Request  $request
+    * @return \Illuminate\Http\RedirectResponse
+    */
     public function store(Request $request): RedirectResponse
     {
-        // Validation
+        // --- VALIDATION ---
         $validatedData = $request->validate([
             'nom_distributeur' => 'required|string|max:120',
             'pnom_distributeur' => 'required|string|max:120',
+            // Assurer unicité du matricule
             'distributeur_id' => 'required|numeric|unique:distributeurs,distributeur_id',
             'tel_distributeur' => 'nullable|string|max:120',
             'adress_distributeur' => 'nullable|string|max:120',
+            // id_distrib_parent peut être null, mais s'il est fourni, il doit exister
             'id_distrib_parent' => 'nullable|integer|exists:distributeurs,id',
+            // Valeurs initiales pour etoiles/rang/flags
             'etoiles_id' => 'required|integer|min:1',
-            'rang' => 'nullable|integer|min:0', // Changé de required à nullable
-            'statut_validation_periode' => 'boolean',
+            'rang' => 'nullable|integer', // CHANGÉ : nullable au lieu de required
+            'statut_validation_periode' => 'sometimes|boolean',
         ]);
 
-        // Ajouter les valeurs par défaut
+        // Ajouter les valeurs par défaut si non fournies
         $validatedData['etoiles_id'] = $validatedData['etoiles_id'] ?? 1;
-        $validatedData['rang'] = $validatedData['rang'] ?? 0; // Garde la valeur par défaut
-        $validatedData['statut_validation_periode'] = $validatedData['statut_validation_periode'] ?? false;
+        $validatedData['rang'] = $validatedData['rang'] ?? 0; // Valeur par défaut si non fourni
+        $validatedData['statut_validation_periode'] = $validatedData['statut_validation_periode'] ?? 0;
 
-        // Création
+        // --- CREATION ---
         try {
             Distributeur::create($validatedData);
 
@@ -100,13 +133,23 @@ class DistributeurController extends Controller
     }
 
     /**
-     * Display the specified resource.
+     * Modifiez aussi la méthode show pour supporter AJAX
+     * Pour récupérer les infos d'un distributeur spécifique
      */
-    public function show(Distributeur $distributeur): View
+    public function show(Distributeur $distributeur)
     {
-        // Charger les relations
-        $distributeur->load(['parent', 'children', 'achats.product']);
-        
+        // Si c'est une requête AJAX, retourner du JSON
+        if (request()->ajax()) {
+            return response()->json([
+                'id' => $distributeur->id,
+                'distributeur_id' => $distributeur->distributeur_id,
+                'nom_distributeur' => $distributeur->nom_distributeur,
+                'pnom_distributeur' => $distributeur->pnom_distributeur,
+                'tel_distributeur' => $distributeur->tel_distributeur,
+            ]);
+        }
+
+        // Sinon, retourner la vue normale
         return view('admin.distributeurs.show', compact('distributeur'));
     }
 
