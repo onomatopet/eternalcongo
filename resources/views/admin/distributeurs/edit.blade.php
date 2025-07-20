@@ -2,179 +2,341 @@
 
 @extends('layouts.admin')
 
+@section('title', 'Modifier un Distributeur')
+
 @section('content')
-<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-    <h1 class="h2">Modifier le Distributeur #{{ $distributeur->distributeur_id }}</h1>
-    <div class="btn-toolbar mb-2 mb-md-0">
-        <div class="btn-group me-2">
-            <a href="{{ route('admin.distributeurs.show', $distributeur) }}" class="btn btn-info">
-                <i class="fas fa-eye me-1"></i>Consulter
-            </a>
-            <a href="{{ route('admin.distributeurs.index') }}" class="btn btn-secondary">
-                <i class="fas fa-arrow-left me-1"></i>Retour à la liste
-            </a>
+<div class="min-h-screen bg-gray-50 py-8">
+    <div class="px-4 sm:px-6 lg:px-8">
+        {{-- En-tête avec fil d'Ariane --}}
+        <div class="bg-white rounded-lg shadow-sm px-6 py-4 mb-6">
+            <nav class="flex items-center text-sm">
+                <a href="{{ route('admin.dashboard') }}" class="text-gray-500 hover:text-gray-700 transition-colors duration-200">
+                    <svg class="w-4 h-4 mr-1 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/>
+                    </svg>
+                    Tableau de Bord
+                </a>
+                <span class="mx-2 text-gray-400">/</span>
+                <a href="{{ route('admin.distributeurs.index') }}" class="text-gray-500 hover:text-gray-700 transition-colors duration-200">
+                    Distributeurs
+                </a>
+                <span class="mx-2 text-gray-400">/</span>
+                <span class="text-gray-700 font-medium">Modifier</span>
+            </nav>
         </div>
-    </div>
-</div>
 
-{{-- Affichage des erreurs de validation --}}
-@if($errors->any())
-    <div class="alert alert-danger">
-        <h6><i class="fas fa-exclamation-triangle me-2"></i>Veuillez corriger les erreurs suivantes :</h6>
-        <ul class="mb-0">
-            @foreach($errors->all() as $error)
-                <li>{{ $error }}</li>
-            @endforeach
-        </ul>
-    </div>
-@endif
+        {{-- Titre principal avec actions --}}
+        <div class="mb-8 flex justify-between items-center">
+            <div>
+                <h1 class="text-3xl font-bold text-gray-900">Modifier le distributeur</h1>
+                <p class="mt-2 text-gray-600">Matricule : <span class="font-semibold">{{ $distributeur->distributeur_id }}</span></p>
+            </div>
+            <div class="flex space-x-3">
+                <a href="{{ route('admin.distributeurs.show', $distributeur) }}"
+                   class="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+                    </svg>
+                    Voir la fiche
+                </a>
+            </div>
+        </div>
 
-{{-- Affichage des messages flash --}}
-@if(session('error'))
-    <div class="alert alert-danger alert-dismissible fade show" role="alert">
-        <i class="fas fa-exclamation-circle me-2"></i>{{ session('error') }}
-        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-    </div>
-@endif
+        {{-- Affichage des erreurs --}}
+        @if ($errors->any())
+            <div class="bg-red-50 border-l-4 border-red-400 p-4 mb-6 rounded-lg">
+                <div class="flex">
+                    <div class="flex-shrink-0">
+                        <svg class="h-5 w-5 text-red-400" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"/>
+                        </svg>
+                    </div>
+                    <div class="ml-3">
+                        <h3 class="text-sm font-medium text-red-800">Des erreurs ont été détectées :</h3>
+                        <div class="mt-2 text-sm text-red-700">
+                            <ul class="list-disc list-inside space-y-1">
+                                @foreach ($errors->all() as $error)
+                                    <li>{{ $error }}</li>
+                                @endforeach
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        @endif
 
-<div class="card">
-    <div class="card-header">
-        <i class="fas fa-user-edit me-2"></i>Modifier les informations du distributeur
-    </div>
-    <div class="card-body">
-        <form method="POST" action="{{ route('admin.distributeurs.update', $distributeur) }}">
+        {{-- Formulaire principal --}}
+        <form action="{{ route('admin.distributeurs.update', $distributeur) }}" method="POST" class="space-y-8">
             @csrf
             @method('PUT')
-            
-            <div class="row">
-                {{-- Informations personnelles --}}
-                <div class="col-md-6">
-                    <h5 class="border-bottom pb-2 mb-3">Informations personnelles</h5>
-                    
-                    <div class="mb-3">
-                        <label for="distributeur_id" class="form-label">Matricule <span class="text-danger">*</span></label>
-                        <input type="number" class="form-control @error('distributeur_id') is-invalid @enderror" 
-                               id="distributeur_id" name="distributeur_id" value="{{ old('distributeur_id', $distributeur->distributeur_id) }}" required>
+
+            {{-- Informations personnelles --}}
+            <div class="bg-white shadow-sm rounded-lg p-6">
+                <h2 class="text-lg font-semibold text-gray-900 mb-6">Informations personnelles</h2>
+
+                <div class="grid grid-cols-1 gap-6 sm:grid-cols-2">
+                    {{-- Matricule --}}
+                    <div>
+                        <label for="distributeur_id" class="block text-sm font-medium text-gray-700">
+                            Matricule <span class="text-red-500">*</span>
+                        </label>
+                        <input type="text"
+                               name="distributeur_id"
+                               id="distributeur_id"
+                               value="{{ old('distributeur_id', $distributeur->distributeur_id) }}"
+                               required
+                               class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm @error('distributeur_id') border-red-300 @enderror"
+                               placeholder="Ex: DIST001">
                         @error('distributeur_id')
-                            <div class="invalid-feedback">{{ $message }}</div>
+                            <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
                         @enderror
                     </div>
 
-                    <div class="mb-3">
-                        <label for="pnom_distributeur" class="form-label">Prénom <span class="text-danger">*</span></label>
-                        <input type="text" class="form-control @error('pnom_distributeur') is-invalid @enderror" 
-                               id="pnom_distributeur" name="pnom_distributeur" value="{{ old('pnom_distributeur', $distributeur->pnom_distributeur) }}" required>
-                        @error('pnom_distributeur')
-                            <div class="invalid-feedback">{{ $message }}</div>
-                        @enderror
+                    {{-- Statut de validation --}}
+                    <div>
+                        <label for="statut_validation_periode" class="block text-sm font-medium text-gray-700">
+                            Statut de validation
+                        </label>
+                        <select name="statut_validation_periode"
+                                id="statut_validation_periode"
+                                class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                            <option value="1" {{ old('statut_validation_periode', $distributeur->statut_validation_periode) == '1' ? 'selected' : '' }}>Validé</option>
+                            <option value="0" {{ old('statut_validation_periode', $distributeur->statut_validation_periode) == '0' ? 'selected' : '' }}>Non validé</option>
+                        </select>
                     </div>
 
-                    <div class="mb-3">
-                        <label for="nom_distributeur" class="form-label">Nom <span class="text-danger">*</span></label>
-                        <input type="text" class="form-control @error('nom_distributeur') is-invalid @enderror" 
-                               id="nom_distributeur" name="nom_distributeur" value="{{ old('nom_distributeur', $distributeur->nom_distributeur) }}" required>
+                    {{-- Nom --}}
+                    <div>
+                        <label for="nom_distributeur" class="block text-sm font-medium text-gray-700">
+                            Nom <span class="text-red-500">*</span>
+                        </label>
+                        <input type="text"
+                               name="nom_distributeur"
+                               id="nom_distributeur"
+                               value="{{ old('nom_distributeur', $distributeur->nom_distributeur) }}"
+                               required
+                               class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm @error('nom_distributeur') border-red-300 @enderror"
+                               placeholder="Nom de famille">
                         @error('nom_distributeur')
-                            <div class="invalid-feedback">{{ $message }}</div>
+                            <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
                         @enderror
                     </div>
 
-                    <div class="mb-3">
-                        <label for="tel_distributeur" class="form-label">Téléphone</label>
-                        <input type="text" class="form-control @error('tel_distributeur') is-invalid @enderror" 
-                               id="tel_distributeur" name="tel_distributeur" value="{{ old('tel_distributeur', $distributeur->tel_distributeur) }}">
+                    {{-- Prénom --}}
+                    <div>
+                        <label for="pnom_distributeur" class="block text-sm font-medium text-gray-700">
+                            Prénom <span class="text-red-500">*</span>
+                        </label>
+                        <input type="text"
+                               name="pnom_distributeur"
+                               id="pnom_distributeur"
+                               value="{{ old('pnom_distributeur', $distributeur->pnom_distributeur) }}"
+                               required
+                               class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm @error('pnom_distributeur') border-red-300 @enderror"
+                               placeholder="Prénom">
+                        @error('pnom_distributeur')
+                            <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
+                        @enderror
+                    </div>
+
+                    {{-- Téléphone --}}
+                    <div>
+                        <label for="tel_distributeur" class="block text-sm font-medium text-gray-700">
+                            Téléphone
+                        </label>
+                        <input type="tel"
+                               name="tel_distributeur"
+                               id="tel_distributeur"
+                               value="{{ old('tel_distributeur', $distributeur->tel_distributeur) }}"
+                               class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm @error('tel_distributeur') border-red-300 @enderror"
+                               placeholder="+237 6XX XXX XXX">
                         @error('tel_distributeur')
-                            <div class="invalid-feedback">{{ $message }}</div>
+                            <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
                         @enderror
                     </div>
 
-                    <div class="mb-3">
-                        <label for="adress_distributeur" class="form-label">Adresse</label>
-                        <textarea class="form-control @error('adress_distributeur') is-invalid @enderror" 
-                                  id="adress_distributeur" name="adress_distributeur" rows="3">{{ old('adress_distributeur', $distributeur->adress_distributeur) }}</textarea>
+                    {{-- Adresse --}}
+                    <div>
+                        <label for="adress_distributeur" class="block text-sm font-medium text-gray-700">
+                            Adresse
+                        </label>
+                        <input type="text"
+                               name="adress_distributeur"
+                               id="adress_distributeur"
+                               value="{{ old('adress_distributeur', $distributeur->adress_distributeur) }}"
+                               class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm @error('adress_distributeur') border-red-300 @enderror"
+                               placeholder="Adresse complète">
                         @error('adress_distributeur')
-                            <div class="invalid-feedback">{{ $message }}</div>
+                            <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
                         @enderror
                     </div>
                 </div>
+            </div>
 
-                {{-- Informations MLM --}}
-                <div class="col-md-6">
-                    <h5 class="border-bottom pb-2 mb-3">Informations MLM</h5>
-                    
-                    <div class="mb-3">
-                        <label for="id_distrib_parent" class="form-label">Distributeur Parent</label>
-                        <select class="form-select @error('id_distrib_parent') is-invalid @enderror" 
-                                id="id_distrib_parent" name="id_distrib_parent">
-                            <option value="">-- Aucun parent (distributeur racine) --</option>
-                            @foreach($potentialParents as $id => $displayName)
-                                <option value="{{ $id }}" {{ old('id_distrib_parent', $distributeur->id_distrib_parent) == $id ? 'selected' : '' }}>
-                                    {{ $displayName }}
+            {{-- Informations de parrainage et niveau --}}
+            <div class="bg-white shadow-sm rounded-lg p-6">
+                <h2 class="text-lg font-semibold text-gray-900 mb-6">Parrainage et niveau</h2>
+
+                <div class="grid grid-cols-1 gap-6 sm:grid-cols-2">
+                    {{-- Distributeur parent --}}
+                    <div>
+                        <label for="id_distrib_parent" class="block text-sm font-medium text-gray-700">
+                            Distributeur parent (Parrain)
+                        </label>
+                        <select name="id_distrib_parent"
+                                id="id_distrib_parent"
+                                class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm @error('id_distrib_parent') border-red-300 @enderror">
+                            <option value="">-- Aucun parent --</option>
+                            @foreach($potentialParents as $parentId => $parentName)
+                                <option value="{{ $parentId }}" {{ old('id_distrib_parent', $distributeur->id_distrib_parent) == $parentId ? 'selected' : '' }}>
+                                    {{ $parentName }}
                                 </option>
                             @endforeach
                         </select>
                         @error('id_distrib_parent')
-                            <div class="invalid-feedback">{{ $message }}</div>
+                            <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
                         @enderror
-                        <div class="form-text">Sélectionner le distributeur qui parraine cette personne</div>
+                        @if($distributeur->children()->exists())
+                            <p class="mt-1 text-sm text-amber-600">
+                                <svg class="w-4 h-4 inline mr-1" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>
+                                </svg>
+                                Ce distributeur a {{ $distributeur->children()->count() }} filleul(s) direct(s)
+                            </p>
+                        @endif
                     </div>
 
-                    <div class="mb-3">
-                        <label for="etoiles_id" class="form-label">Niveau d'étoiles <span class="text-danger">*</span></label>
-                        <select class="form-select @error('etoiles_id') is-invalid @enderror" 
-                                id="etoiles_id" name="etoiles_id" required>
-                            <option value="1" {{ old('etoiles_id', $distributeur->etoiles_id) == 1 ? 'selected' : '' }}>1 étoile</option>
-                            <option value="2" {{ old('etoiles_id', $distributeur->etoiles_id) == 2 ? 'selected' : '' }}>2 étoiles</option>
-                            <option value="3" {{ old('etoiles_id', $distributeur->etoiles_id) == 3 ? 'selected' : '' }}>3 étoiles</option>
-                            <option value="4" {{ old('etoiles_id', $distributeur->etoiles_id) == 4 ? 'selected' : '' }}>4 étoiles</option>
-                            <option value="5" {{ old('etoiles_id', $distributeur->etoiles_id) == 5 ? 'selected' : '' }}>5 étoiles</option>
+                    {{-- Niveau étoiles --}}
+                    <div>
+                        <label for="etoiles_id" class="block text-sm font-medium text-gray-700">
+                            Niveau (étoiles)
+                        </label>
+                        <select name="etoiles_id"
+                                id="etoiles_id"
+                                class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                            @for($i = 1; $i <= 10; $i++)
+                                <option value="{{ $i }}" {{ old('etoiles_id', $distributeur->etoiles_id) == $i ? 'selected' : '' }}>
+                                    {{ $i }} étoile{{ $i > 1 ? 's' : '' }}
+                                </option>
+                            @endfor
                         </select>
-                        @error('etoiles_id')
-                            <div class="invalid-feedback">{{ $message }}</div>
-                        @enderror
                     </div>
 
-                    <div class="mb-3">
-                        <label for="rang" class="form-label">Rang <span class="text-danger">*</span></label>
-                        <input type="number" class="form-control @error('rang') is-invalid @enderror" 
-                               id="rang" name="rang" value="{{ old('rang', $distributeur->rang) }}" min="0" required>
-                        @error('rang')
-                            <div class="invalid-feedback">{{ $message }}</div>
-                        @enderror
+                    {{-- Rang --}}
+                    <div>
+                        <label for="rang" class="block text-sm font-medium text-gray-700">
+                            Rang
+                        </label>
+                        <input type="number"
+                               name="rang"
+                               id="rang"
+                               value="{{ old('rang', $distributeur->rang) }}"
+                               min="0"
+                               class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                               placeholder="0">
                     </div>
 
-                    <div class="mb-3">
-                        <div class="form-check">
-                            <input class="form-check-input" type="checkbox" value="1" 
-                                   id="statut_validation_periode" name="statut_validation_periode" 
-                                   {{ old('statut_validation_periode', $distributeur->statut_validation_periode) ? 'checked' : '' }}>
-                            <label class="form-check-label" for="statut_validation_periode">
-                                Période validée
-                            </label>
-                        </div>
-                        <div class="form-text">Cocher si la période courante est validée pour ce distributeur</div>
-                    </div>
-
-                    {{-- Informations en lecture seule --}}
-                    <div class="alert alert-info">
-                        <h6><i class="fas fa-info-circle me-2"></i>Informations</h6>
-                        <p class="mb-1"><strong>Inscription :</strong> {{ $distributeur->created_at->format('d/m/Y à H:i') }}</p>
-                        <p class="mb-1"><strong>Enfants directs :</strong> {{ $distributeur->children()->count() }}</p>
-                        <p class="mb-0"><strong>Achats total :</strong> {{ $distributeur->achats()->count() }}</p>
+                    {{-- Date de création --}}
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">
+                            Date d'inscription
+                        </label>
+                        <p class="mt-1 text-sm text-gray-900 bg-gray-50 rounded-md px-3 py-2">
+                            {{ $distributeur->created_at->format('d/m/Y à H:i') }}
+                        </p>
                     </div>
                 </div>
             </div>
 
-            <hr>
+            {{-- Statistiques --}}
+            <div class="bg-white shadow-sm rounded-lg p-6">
+                <h2 class="text-lg font-semibold text-gray-900 mb-6">Statistiques</h2>
 
-            <div class="d-grid gap-2 d-md-flex justify-content-md-end">
-                <a href="{{ route('admin.distributeurs.show', $distributeur) }}" class="btn btn-secondary me-md-2">
-                    <i class="fas fa-times me-1"></i>Annuler
-                </a>
-                <button type="submit" class="btn btn-success">
-                    <i class="fas fa-save me-1"></i>Enregistrer les modifications
+                <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                    <div class="bg-gray-50 rounded-lg p-4">
+                        <p class="text-sm font-medium text-gray-500">Nombre de filleuls directs</p>
+                        <p class="mt-1 text-2xl font-semibold text-gray-900">{{ $distributeur->children()->count() }}</p>
+                    </div>
+                    <div class="bg-gray-50 rounded-lg p-4">
+                        <p class="text-sm font-medium text-gray-500">Nombre d'achats</p>
+                        <p class="mt-1 text-2xl font-semibold text-gray-900">{{ $distributeur->achats()->count() }}</p>
+                    </div>
+                    <div class="bg-gray-50 rounded-lg p-4">
+                        <p class="text-sm font-medium text-gray-500">Nombre de bonus</p>
+                        <p class="mt-1 text-2xl font-semibold text-gray-900">{{ $distributeur->bonuses()->count() }}</p>
+                    </div>
+                </div>
+            </div>
+
+            {{-- Boutons d'action --}}
+            <div class="flex justify-between">
+                <button type="button"
+                        @click="$dispatch('delete-modal-show')"
+                        class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500">
+                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                    </svg>
+                    Supprimer
                 </button>
+
+                <div class="flex space-x-3">
+                    <a href="{{ route('admin.distributeurs.index') }}"
+                       class="bg-white py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                        Annuler
+                    </a>
+                    <button type="submit"
+                            class="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                        </svg>
+                        Enregistrer les modifications
+                    </button>
+                </div>
             </div>
         </form>
+
+        {{-- Formulaire de suppression caché --}}
+        <form id="delete-form" action="{{ route('admin.distributeurs.destroy', $distributeur) }}" method="POST" class="hidden">
+            @csrf
+            @method('DELETE')
+        </form>
+
+        {{-- Modal de confirmation de suppression --}}
+        @include('components.modal-confirmation', [
+            'id' => 'delete-modal',
+            'title' => 'Confirmer la suppression',
+            'message' => 'Êtes-vous sûr de vouloir supprimer ce distributeur ? Cette action est irréversible. Tous les achats et bonus associés seront également supprimés.',
+            'confirmText' => 'Oui, supprimer',
+            'confirmClass' => 'bg-red-600 hover:bg-red-700',
+            'formId' => 'delete-form'
+        ])
     </div>
 </div>
+
+@push('scripts')
+<script>
+    // Auto-formatage du numéro de téléphone
+    document.getElementById('tel_distributeur').addEventListener('input', function(e) {
+        let value = e.target.value.replace(/\s/g, '');
+        let formattedValue = '';
+
+        if (value.startsWith('+237')) {
+            value = value.substring(4);
+        }
+
+        if (value.length > 0) {
+            formattedValue = '+237 ';
+            for (let i = 0; i < value.length && i < 9; i++) {
+                if (i === 3 || i === 6) {
+                    formattedValue += ' ';
+                }
+                formattedValue += value[i];
+            }
+        }
+
+        e.target.value = formattedValue;
+    });
+</script>
+@endpush
 @endsection

@@ -32,6 +32,9 @@
             }
         }
     </script>
+
+    <!-- Additional Styles -->
+    @stack('styles')
 </head>
 <body class="h-full">
     <div x-data="{ sidebarOpen: false }" class="h-full">
@@ -87,15 +90,6 @@
                                                     <path stroke-linecap="round" stroke-linejoin="round" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z" />
                                                 </svg>
                                                 Produits
-                                            </a>
-                                        </li>
-                                        <li>
-                                            <a href="#" onclick="alert('Fonctionnalité à venir')" class="text-gray-700 hover:text-primary-600 hover:bg-gray-50 group flex gap-x-3 rounded-md p-2 text-sm leading-6 font-semibold">
-                                                <svg class="h-6 w-6 shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 7.996 21 8.625 21h6.75c.621 0 1.125-.504 1.125-1.125v-6.75c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v6.75C21 20.496 20.496 21 19.875 21H4.125C3.504 21 3 20.496 3 19.875v-6.75z" />
-                                                    <path stroke-linecap="round" stroke-linejoin="round" d="M3 7.5c0-.621.504-1.125 1.125-1.125h15.75c.621 0 1.125.504 1.125 1.125S20.496 8.625 19.875 8.625H4.125C3.504 8.625 3 8.121 3 7.5z" />
-                                                </svg>
-                                                Rapports
                                             </a>
                                         </li>
                                         <li>
@@ -158,15 +152,6 @@
                                     </a>
                                 </li>
                                 <li>
-                                    <a href="#" onclick="alert('Fonctionnalité à venir')" class="text-gray-700 hover:text-primary-600 hover:bg-gray-50 group flex gap-x-3 rounded-md p-2 text-sm leading-6 font-semibold">
-                                        <svg class="h-6 w-6 shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-                                            <path stroke-linecap="round" stroke-linejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 7.996 21 8.625 21h6.75c.621 0 1.125-.504 1.125-1.125v-6.75c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v6.75C21 20.496 20.496 21 19.875 21H4.125C3.504 21 3 20.496 3 19.875v-6.75z" />
-                                            <path stroke-linecap="round" stroke-linejoin="round" d="M3 7.5c0-.621.504-1.125 1.125-1.125h15.75c.621 0 1.125.504 1.125 1.125S20.496 8.625 19.875 8.625H4.125C3.504 8.625 3 8.121 3 7.5z" />
-                                        </svg>
-                                        Rapports
-                                    </a>
-                                </li>
-                                <li>
                                     <a href="{{ route('admin.bonuses.index') }}" class="{{ request()->routeIs('admin.bonuses.*') ? 'bg-primary-50 text-primary-600' : 'text-gray-700 hover:text-primary-600 hover:bg-gray-50' }} group flex gap-x-3 rounded-md p-2 text-sm leading-6 font-semibold">
                                         <svg class="h-6 w-6 shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
                                             <path stroke-linecap="round" stroke-linejoin="round" d="M21 11.25v8.25a1.5 1.5 0 01-1.5 1.5H5.25a1.5 1.5 0 01-1.5-1.5v-8.25M12 4.875A2.625 2.625 0 109.375 7.5H12m0-2.625V7.5m0-2.625A2.625 2.625 0 1114.625 7.5H12m0 0V21m-8.625-9.75h18c.621 0 1.125-.504 1.125-1.125V11.25c0-4.46-3.243-8.161-7.5-8.876a9.06 9.06 0 00-5.25 0C4.243 3.089 1 6.79 1 11.25v.875c0 .621.504 1.125 1.125 1.125h18z" />
@@ -190,45 +175,23 @@
                     </svg>
                 </button>
 
-                <div class="h-6 w-px bg-gray-200 lg:hidden"></div>
-
                 <div class="flex flex-1 gap-x-4 self-stretch lg:gap-x-6">
+                    <div class="relative flex flex-1"></div>
                     <div class="flex items-center gap-x-4 lg:gap-x-6">
-                        <!-- Search -->
-                        <div class="relative">
-                            <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
-                                <svg class="h-5 w-5 text-gray-400" viewBox="0 0 20 20" fill="currentColor">
-                                    <path fill-rule="evenodd" d="M9 3.5a5.5 5.5 0 100 11 5.5 5.5 0 000-11zM2 9a7 7 0 1112.452 4.391l3.328 3.329a.75.75 0 11-1.06 1.06l-3.329-3.328A7 7 0 012 9z" clip-rule="evenodd" />
-                                </svg>
-                            </div>
-                            <input class="block w-full rounded-md border-0 bg-white py-1.5 pl-10 pr-3 text-gray-900 ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-primary-600 sm:text-sm sm:leading-6" placeholder="Rechercher..." type="search">
-                        </div>
-                    </div>
-                    <div class="flex items-center gap-x-4 lg:gap-x-6">
-                        <!-- Notifications -->
-                        <button type="button" class="-m-2.5 p-2.5 text-gray-400 hover:text-gray-500">
-                            <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75v-.7V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0" />
-                            </svg>
-                        </button>
-
-                        <div class="hidden lg:block lg:h-6 lg:w-px lg:bg-gray-200"></div>
-
-                        <!-- Profile dropdown -->
+                        <!-- User menu -->
                         <div x-data="{ open: false }" class="relative">
-                            <button @click="open = !open" type="button" class="-m-1.5 flex items-center p-1.5" id="user-menu-button">
-                                <span class="sr-only">Ouvrir le menu utilisateur</span>
-                                <div class="h-8 w-8 rounded-full bg-primary-100 flex items-center justify-center">
-                                    <span class="text-sm font-medium text-primary-600">{{ substr(auth()->user()->name, 0, 1) }}</span>
+                            <button @click="open = !open" type="button" class="-m-1.5 flex items-center p-1.5">
+                                <span class="sr-only">Open user menu</span>
+                                <div class="h-8 w-8 rounded-full bg-gray-200 flex items-center justify-center">
+                                    <span class="text-sm font-medium text-gray-600">{{ Auth::user()->name[0] ?? 'U' }}</span>
                                 </div>
                                 <span class="hidden lg:flex lg:items-center">
-                                    <span class="ml-4 text-sm font-semibold leading-6 text-gray-900">{{ auth()->user()->name }}</span>
+                                    <span class="ml-4 text-sm font-semibold leading-6 text-gray-900">{{ Auth::user()->name ?? 'User' }}</span>
                                     <svg class="ml-2 h-5 w-5 text-gray-400" viewBox="0 0 20 20" fill="currentColor">
                                         <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clip-rule="evenodd" />
                                     </svg>
                                 </span>
                             </button>
-
                             <div x-show="open" @click.away="open = false" x-transition:enter="transition ease-out duration-100" x-transition:enter-start="transform opacity-0 scale-95" x-transition:enter-end="transform opacity-100 scale-100" x-transition:leave="transition ease-in duration-75" x-transition:leave-start="transform opacity-100 scale-100" x-transition:leave-end="transform opacity-0 scale-95" class="absolute right-0 z-10 mt-2.5 w-32 origin-top-right rounded-md bg-white py-2 shadow-lg ring-1 ring-gray-900/5 focus:outline-none" x-cloak>
                                 <a href="{{ route('dashboard') }}" class="block px-3 py-1 text-sm leading-6 text-gray-900 hover:bg-gray-50">Accueil Utilisateur</a>
                                 <a href="{{ route('profile.edit') }}" class="block px-3 py-1 text-sm leading-6 text-gray-900 hover:bg-gray-50">Profil</a>
@@ -245,6 +208,10 @@
             <!-- Main content -->
             <main class="py-10">
                 <div class="px-4 sm:px-6 lg:px-8">
+                    {{-- Inclusion du composant de messages flash --}}
+                    @include('components.flash-messages')
+
+                    {{-- Contenu principal de la page --}}
                     @yield('content')
                 </div>
             </main>
