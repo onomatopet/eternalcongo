@@ -3,7 +3,7 @@
 namespace App\Console\Commands;
 
 use Illuminate\Console\Command;
-use App\Models\LevelCurrentTest as LevelCurrent;
+use App\Models\LevelCurrent; // Changé de LevelCurrentTest
 use App\Models\Distributeur;
 use App\Services\EternalHelperLegacyMatriculeDB;
 use App\Services\GradeCalculator;
@@ -18,6 +18,7 @@ class ProcessAllDistributorAdvancements extends Command
                                                     {--max-iterations=10 : Maximum number of calculation passes.}
                                                     {--batch-size=1000 : Process distributors in batches}
                                                     {--dry-run : Show what would be changed without applying}
+                                                    {--validated-only : Process only distributors who have made purchases in the period}
                                                     {--export= : Export promotions to CSV file}';
 
     protected $description = 'Calculates and applies grade advancements for all distributors iteratively, with optimizations.';
@@ -64,12 +65,19 @@ class ProcessAllDistributorAdvancements extends Command
              return self::FAILURE;
         }
 
-        $levelEntry = LevelCurrent::where('distributeur_id', $matricule)
+        // CORRECTION : Chercher par matricule dans la table distributeurs, puis récupérer l'ID
+        $distributeur = Distributeur::where('distributeur_id', $matricule)->first();
+        if (!$distributeur) {
+            $this->error("No distributor found with matricule {$matricule}.");
+            return self::FAILURE;
+        }
+
+        $levelEntry = LevelCurrent::where('distributeur_id', $distributeur->id) // Utiliser l'ID, pas le matricule
                                   ->where('period', $period)
                                   ->first();
 
         if (!$levelEntry) {
-            $this->error("No LevelCurrentTest entry found for matricule {$matricule} in period {$period}.");
+            $this->error("No LevelCurrent entry found for matricule {$matricule} (ID: {$distributeur->id}) in period {$period}.");
             return self::FAILURE;
         }
 
@@ -78,6 +86,7 @@ class ProcessAllDistributorAdvancements extends Command
             ['Metric', 'Value'],
             [
                 ['Matricule', $matricule],
+                ['Internal ID', $distributeur->id],
                 ['Current Grade (Etoiles)', $levelEntry->etoiles],
                 ['Cumulative Individual', number_format($levelEntry->cumul_individuel)],
                 ['Cumulative Collective', number_format($levelEntry->cumul_collectif)],
@@ -96,7 +105,7 @@ class ProcessAllDistributorAdvancements extends Command
                 $currentGrade,
                 (float)$levelEntry->cumul_individuel,
                 (float)$levelEntry->cumul_collectif,
-                $matricule,
+                $matricule, // Le service utilise probablement encore le matricule
                 $this->branchQualifier
             );
 
@@ -127,12 +136,22 @@ class ProcessAllDistributorAdvancements extends Command
     private function handleBatchProcessingOptimized(): int
     {
         $period = $this->argument('period') ?? date('Y-m');
+        $validatedOnly = $this->option('validated-only');
+
         if (!preg_match('/^\d{4}-\d{2}$/', $period)) {
             $this->error("Invalid period format. Use YYYY-MM format.");
             return self::FAILURE;
         }
 
         $this->info("Starting OPTIMIZED iterative advancement process for period: <fg=yellow>{$period}</>");
+
+        if ($validatedOnly) {
+            $this->info("🛒 <fg=cyan>VALIDATED-ONLY MODE:</fg> Processing only distributors with purchases in period {$period}");
+        }
+
+        if ($this->option('dry-run')) {
+            $this->warn('⚠️  <fg=yellow>DRY RUN MODE:</fg> No database changes will be applied');
+        }
 
         if (!$this->option('force') && !$this->option('dry-run') &&
             !$this->confirm("This will update distributor grades for period {$period}. Continue?", false)) {
@@ -147,16 +166,16 @@ class ProcessAllDistributorAdvancements extends Command
 
             $this->branchQualifier->loadAndBuildMaps();
 
-            // Charger les données avec tri par hiérarchie
-            $levelData = $this->loadDataWithHierarchy($period);
+            // Charger les données avec tri par hiérarchie ET filtrage optionnel
+            $levelData = $this->loadDataWithHierarchy($period, $validatedOnly);
 
             if ($levelData->isEmpty()) {
-                $this->warn("No data found for period {$period}.");
+                $this->warn("No data found for period {$period}" . ($validatedOnly ? " with validated purchases" : "") . ".");
                 return self::SUCCESS;
             }
 
             $loadTime = round(microtime(true) - $startTime, 2);
-            $this->info("Loaded {$levelData->count()} distributors in {$loadTime}s");
+            $this->info("Loaded {$levelData->count()} distributors in {$loadTime}s" . ($validatedOnly ? " (validated purchases only)" : ""));
 
             // 2. Traitement optimisé
             $allPromotions = $this->processPromotionsOptimized($levelData);
@@ -195,26 +214,42 @@ class ProcessAllDistributorAdvancements extends Command
     }
 
     /**
-     * Charge les données avec information de hiérarchie
+     * Charge les données avec information de hiérarchie et filtrage optionnel
+     * CORRECTION MAJEURE : Adaptation aux nouvelles structures ID/matricule
      */
-    private function loadDataWithHierarchy(string $period)
+    private function loadDataWithHierarchy(string $period, bool $validatedOnly = false)
     {
-        return DB::table('level_current_test as l')
-            ->join('distributeurs as d', 'l.distributeur_id', '=', 'd.distributeur_id')
-            ->where('l.period', $period)
-            ->select(
-                'l.distributeur_id',
+        // CORRECTION : Utiliser la bonne table et les bonnes relations
+        $query = DB::table('level_currents as l') // Changé de level_current_test
+            ->join('distributeurs as d', 'l.distributeur_id', '=', 'd.id') // CORRECTION : l.distributeur_id (ID) = d.id (ID)
+            ->where('l.period', $period);
+
+        if ($validatedOnly) {
+            // CORRECTION : Jointure correcte avec achats (utiliser les IDs, pas les matricules)
+            $query->join('achats as a', function($join) use ($period) {
+                $join->on('d.id', '=', 'a.distributeur_id') // CORRECTION : Les deux sont des IDs maintenant
+                     ->where('a.period', '=', $period); // CORRECTION : Utiliser = au lieu de where pour éviter les erreurs SQL
+            });
+
+            // Grouper pour éviter les doublons (un distributeur peut avoir plusieurs achats)
+            $query->groupBy('l.distributeur_id', 'l.etoiles', 'l.cumul_individuel', 'l.cumul_collectif', 'd.id_distrib_parent', 'd.distributeur_id');
+        }
+
+        return $query->select(
+                'l.distributeur_id as internal_id', // ID interne pour les calculs
+                'd.distributeur_id as matricule',   // Matricule pour les services legacy
                 'l.etoiles',
                 'l.cumul_individuel',
                 'l.cumul_collectif',
                 'd.id_distrib_parent'
             )
             ->get()
-            ->keyBy('distributeur_id');
+            ->keyBy('matricule'); // CORRECTION : Indexer par matricule pour compatibilité avec les services
     }
 
     /**
      * Traitement optimisé des promotions
+     * CORRECTION : Adapter aux nouvelles structures de données
      */
     private function processPromotionsOptimized($levelData)
     {
@@ -249,7 +284,7 @@ class ProcessAllDistributorAdvancements extends Command
 
                 // Calculer le nouveau grade potentiel
                 $newGrade = $this->calculateOptimalGrade(
-                    $matricule,
+                    $matricule, // Utiliser le matricule pour les services
                     $currentGrade,
                     $levelEntry->cumul_individuel,
                     $levelEntry->cumul_collectif
@@ -257,6 +292,8 @@ class ProcessAllDistributorAdvancements extends Command
 
                 if ($newGrade > $currentGrade) {
                     $promotionsInThisPass[$matricule] = [
+                        'internal_id' => $levelEntry->internal_id, // AJOUT : Stocker l'ID interne
+                        'matricule' => $matricule,
                         'from' => $levelEntry->etoiles,
                         'to' => $newGrade,
                         'pass' => $passCounter,
@@ -297,20 +334,30 @@ class ProcessAllDistributorAdvancements extends Command
     {
         // Construire un graphe des dépendances
         $children = [];
-        $levels = [];
+        $depths = [];
 
         foreach ($levelData as $matricule => $data) {
             $parent = $data->id_distrib_parent;
             if ($parent && $parent != 0) {
-                if (!isset($children[$parent])) {
-                    $children[$parent] = [];
+                // CORRECTION : Trouver le matricule du parent à partir de son ID
+                $parentMatricule = null;
+                foreach ($levelData as $checkMatricule => $checkData) {
+                    if ($checkData->internal_id == $parent) {
+                        $parentMatricule = $checkMatricule;
+                        break;
+                    }
                 }
-                $children[$parent][] = $matricule;
+
+                if ($parentMatricule) {
+                    if (!isset($children[$parentMatricule])) {
+                        $children[$parentMatricule] = [];
+                    }
+                    $children[$parentMatricule][] = $matricule;
+                }
             }
         }
 
         // Calculer la profondeur de chaque nœud
-        $depths = [];
         $calculateDepth = function($matricule) use (&$calculateDepth, &$depths, $children) {
             if (isset($depths[$matricule])) {
                 return $depths[$matricule];
@@ -355,7 +402,7 @@ class ProcessAllDistributorAdvancements extends Command
                 $calculatedGrade,
                 (float)$cumulInd,
                 (float)$cumulCol,
-                $matricule,
+                $matricule, // Utiliser le matricule pour les services legacy
                 $this->branchQualifier
             );
 
@@ -452,6 +499,7 @@ class ProcessAllDistributorAdvancements extends Command
 
     /**
      * Applique les promotions en base de données
+     * CORRECTION MAJEURE : Utiliser les bons IDs/matricules pour les mises à jour
      */
     private function applyPromotions($promotions, $period): void
     {
@@ -464,17 +512,19 @@ class ProcessAllDistributorAdvancements extends Command
         try {
             $promotions->chunk($batchSize)->each(function($chunk) use ($period, &$progressBar) {
                 // Préparer les mises à jour batch
-                $distributerUpdates = [];
+                $distributeurUpdates = [];
                 $levelUpdates = [];
 
                 foreach ($chunk as $matricule => $promo) {
-                    $distributerUpdates[] = [
-                        'distributeur_id' => $matricule,
+                    // CORRECTION : Mise à jour distributeur par matricule
+                    $distributeurUpdates[] = [
+                        'distributeur_id' => $matricule, // Utiliser le matricule pour identifier
                         'etoiles_id' => $promo['to']
                     ];
 
+                    // CORRECTION : Mise à jour level_currents par ID interne
                     $levelUpdates[] = [
-                        'distributeur_id' => $matricule,
+                        'distributeur_id' => $promo['internal_id'], // Utiliser l'ID interne
                         'period' => $period,
                         'etoiles' => $promo['to']
                     ];
@@ -482,15 +532,15 @@ class ProcessAllDistributorAdvancements extends Command
                     $progressBar->advance();
                 }
 
-                // Batch update
-                if (!empty($distributerUpdates)) {
-                    Distributeur::upsert(
-                        $distributerUpdates,
-                        ['distributeur_id'],
-                        ['etoiles_id']
-                    );
+                // Batch update pour distributeurs (par matricule)
+                if (!empty($distributeurUpdates)) {
+                    foreach ($distributeurUpdates as $update) {
+                        Distributeur::where('distributeur_id', $update['distributeur_id'])
+                                  ->update(['etoiles_id' => $update['etoiles_id']]);
+                    }
 
-                    DB::table('level_current_test')->upsert(
+                    // Batch update pour level_currents (par ID)
+                    DB::table('level_currents')->upsert(
                         $levelUpdates,
                         ['distributeur_id', 'period'],
                         ['etoiles']

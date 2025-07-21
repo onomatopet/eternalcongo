@@ -2,7 +2,7 @@
 namespace App\Console\Commands;
 
 use Illuminate\Console\Command;
-use App\Models\LevelCurrentTest as LevelCurrent;
+use App\Models\LevelCurrent;
 use App\Models\Distributeur;
 use App\Services\EternalHelperLegacyMatriculeDB;
 use App\Services\GradeCalculator;
@@ -48,15 +48,20 @@ class RegularizeGrades extends Command
             $this->info("Loading all data...");
             $startTime = microtime(true);
 
-            // Charger la hiérarchie complète
-            $allDistributors = Distributeur::select('distributeur_id', 'id_distrib_parent', 'etoiles_id')
+            // CORRECTION : Charger la hiérarchie complète avec les bons champs
+            $allDistributors = Distributeur::select('id', 'distributeur_id', 'id_distrib_parent', 'etoiles_id')
                 ->get()
-                ->keyBy('distributeur_id');
+                ->keyBy('distributeur_id'); // Indexer par matricule pour compatibilité
 
-            // Charger les données de niveau pour la période
+            // CORRECTION : Charger les données de niveau pour la période
             $levelData = LevelCurrent::where('period', $period)
+                ->join('distributeurs', 'level_currents.distributeur_id', '=', 'distributeurs.id') // CORRECTION : Jointure par ID
+                ->select(
+                    'level_currents.*',
+                    'distributeurs.distributeur_id as matricule' // Récupérer le matricule
+                )
                 ->get()
-                ->keyBy('distributeur_id');
+                ->keyBy('matricule'); // CORRECTION : Indexer par matricule
 
             if ($levelData->isEmpty()) {
                 $this->warn("No data found for period {$period}");
@@ -106,6 +111,7 @@ class RegularizeGrades extends Command
 
     /**
      * Construit la hiérarchie avec les niveaux de profondeur
+     * CORRECTION : Adaptation aux nouvelles structures ID/matricule
      */
     private function buildHierarchyWithLevels($allDistributors, $levelData): array
     {
@@ -116,15 +122,27 @@ class RegularizeGrades extends Command
             'max_level' => 0
         ];
 
-        // Construire les relations parent-enfant
+        // CORRECTION : Construire les relations parent-enfant avec conversion ID->matricule
         foreach ($allDistributors as $dist) {
             $matricule = $dist->distributeur_id;
-            $parent = $dist->id_distrib_parent;
+            $parentId = $dist->id_distrib_parent;
+
+            // CORRECTION : Trouver le matricule du parent à partir de son ID
+            $parentMatricule = null;
+            if ($parentId && $parentId != 0) {
+                foreach ($allDistributors as $potentialParent) {
+                    if ($potentialParent->id == $parentId) {
+                        $parentMatricule = $potentialParent->distributeur_id;
+                        break;
+                    }
+                }
+            }
 
             // Initialiser le nœud
             $hierarchy['nodes'][$matricule] = [
                 'matricule' => $matricule,
-                'parent' => $parent,
+                'internal_id' => $dist->id, // AJOUT : Stocker l'ID interne
+                'parent' => $parentMatricule, // CORRECTION : Utiliser le matricule du parent
                 'level' => -1,  // Non calculé
                 'current_grade' => $levelData->has($matricule) ? $levelData->get($matricule)->etoiles : $dist->etoiles_id,
                 'cumul_individuel' => $levelData->has($matricule) ? $levelData->get($matricule)->cumul_individuel : 0,
@@ -132,18 +150,18 @@ class RegularizeGrades extends Command
             ];
 
             // Enregistrer la relation parent-enfant
-            if ($parent && $parent != 0) {
-                if (!isset($hierarchy['children'][$parent])) {
-                    $hierarchy['children'][$parent] = [];
+            if ($parentMatricule) {
+                if (!isset($hierarchy['children'][$parentMatricule])) {
+                    $hierarchy['children'][$parentMatricule] = [];
                 }
-                $hierarchy['children'][$parent][] = $matricule;
+                $hierarchy['children'][$parentMatricule][] = $matricule;
             }
         }
 
         // Calculer les niveaux de profondeur (BFS depuis les racines)
         $queue = [];
         foreach ($hierarchy['nodes'] as $matricule => $node) {
-            if (!$node['parent'] || $node['parent'] == 0) {
+            if (!$node['parent']) {
                 $queue[] = [$matricule, 0];
                 $hierarchy['nodes'][$matricule]['level'] = 0;
             }
@@ -213,6 +231,8 @@ class RegularizeGrades extends Command
                 // Enregistrer si changement
                 if ($calculatedGrade != $node['current_grade']) {
                     $updates[$matricule] = [
+                        'internal_id' => $node['internal_id'], // AJOUT : Stocker l'ID interne
+                        'matricule' => $matricule,
                         'from' => $node['current_grade'],
                         'to' => $calculatedGrade,
                         'cumul_individuel' => $node['cumul_individuel'],
@@ -221,7 +241,7 @@ class RegularizeGrades extends Command
                 }
 
                 // Mettre à jour les compteurs de branches pour le parent
-                if ($node['parent'] && $node['parent'] != 0) {
+                if ($node['parent']) {
                     if (!isset($branchCounts[$node['parent']])) {
                         $branchCounts[$node['parent']] = [];
                     }
@@ -478,6 +498,7 @@ class RegularizeGrades extends Command
 
     /**
      * Applique les mises à jour par batch
+     * CORRECTION : Adaptation aux nouvelles structures ID/matricule
      */
     private function applyBatchUpdates($updates, $period): void
     {
@@ -491,17 +512,19 @@ class RegularizeGrades extends Command
         try {
             foreach ($chunks as $chunk) {
                 // Préparer les mises à jour batch
-                $distributerUpdates = [];
+                $distributeurUpdates = [];
                 $levelUpdates = [];
 
                 foreach ($chunk as $matricule => $update) {
-                    $distributerUpdates[] = [
+                    // CORRECTION : Mise à jour distributeur par matricule
+                    $distributeurUpdates[] = [
                         'distributeur_id' => $matricule,
                         'etoiles_id' => $update['to']
                     ];
 
+                    // CORRECTION : Mise à jour level_currents par ID interne
                     $levelUpdates[] = [
-                        'distributeur_id' => $matricule,
+                        'distributeur_id' => $update['internal_id'],
                         'period' => $period,
                         'etoiles' => $update['to']
                     ];
@@ -509,15 +532,15 @@ class RegularizeGrades extends Command
                     $progressBar->advance();
                 }
 
-                // Mise à jour batch
-                if (!empty($distributerUpdates)) {
-                    Distributeur::upsert(
-                        $distributerUpdates,
-                        ['distributeur_id'],
-                        ['etoiles_id']
-                    );
+                // CORRECTION : Mise à jour batch pour distributeurs (par matricule)
+                if (!empty($distributeurUpdates)) {
+                    foreach ($distributeurUpdates as $upd) {
+                        Distributeur::where('distributeur_id', $upd['distributeur_id'])
+                                  ->update(['etoiles_id' => $upd['etoiles_id']]);
+                    }
 
-                    DB::table('level_current_test')->upsert(
+                    // CORRECTION : Mise à jour batch pour level_currents (par ID interne)
+                    DB::table('level_currents')->upsert(
                         $levelUpdates,
                         ['distributeur_id', 'period'],
                         ['etoiles']

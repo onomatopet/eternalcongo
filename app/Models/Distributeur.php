@@ -106,4 +106,30 @@ class Distributeur extends Model // Ou extends Authenticatable
     {
         return trim("{$this->pnom_distributeur} {$this->nom_distributeur}");
     }
+
+    // À ajouter dans app/Models/Distributeur.php dans la section des relations
+
+    /**
+     * Relation: Un Distributeur a plusieurs enregistrements d'historique d'avancement.
+     */
+    public function avancementHistory(): HasMany
+    {
+        return $this->hasMany(AvancementHistory::class, 'distributeur_id', 'id');
+    }
+
+    /**
+     * Récupère les avancements pour une période spécifique
+     */
+    public function getAvancementsForPeriod(string $period)
+    {
+        return $this->avancementHistory()->forPeriod($period);
+    }
+
+    /**
+     * Récupère le dernier avancement
+     */
+    public function getLastAdvancement()
+    {
+        return $this->avancementHistory()->latest('date_avancement')->first();
+    }
 }

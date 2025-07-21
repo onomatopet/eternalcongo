@@ -3,6 +3,7 @@
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\Admin\AchatController;
 use App\Http\Controllers\Admin\DistributeurController;
+use App\Http\Controllers\Admin\ProcessController;
 use Illuminate\Support\Facades\Route;
 
 require __DIR__.'/auth.php';
@@ -49,6 +50,12 @@ Route::middleware(['auth', 'verified', 'check_admin_role'])
         Route::resource('bonuses', App\Http\Controllers\Admin\BonusController::class);
         Route::get('bonuses/{bonus}/pdf', [App\Http\Controllers\Admin\BonusController::class, 'generatePdf'])
             ->name('bonuses.pdf');
+
+        // Routes pour les processus métier
+        Route::get('processes', [ProcessController::class, 'index'])->name('processes.index');
+        Route::post('processes/advancements', [ProcessController::class, 'processAdvancements'])->name('processes.advancements');
+        Route::post('processes/regularization', [ProcessController::class, 'regularizeGrades'])->name('processes.regularization');
+        Route::get('processes/stats', [ProcessController::class, 'apiStats'])->name('processes.stats');
 
         // Routes de test pour vérifier les contrôleurs
         Route::get('test-distributeurs', [DistributeurController::class, 'index'])->name('test.distributeurs');
