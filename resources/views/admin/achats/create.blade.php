@@ -62,7 +62,7 @@
             </div>
         @endif
 
-        {{-- Affichage des erreurs de validation --}}
+        {{-- Affichage des erreurs --}}
         @if ($errors->any())
             <div class="bg-red-50 border-l-4 border-red-400 p-4 mb-6 rounded-lg">
                 <div class="flex">
@@ -93,10 +93,10 @@
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 {{-- Section Informations de base --}}
                 <div class="bg-white shadow-lg rounded-lg overflow-hidden h-fit">
-                    <div class="bg-gradient-to-r from-purple-500 to-purple-600 px-6 py-4">
+                    <div class="bg-gradient-to-r from-green-500 to-green-600 px-6 py-4">
                         <h2 class="text-xl font-semibold text-white flex items-center">
                             <svg class="w-6 h-6 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
                             </svg>
                             Informations de base
                         </h2>
@@ -107,228 +107,186 @@
                             <label for="period" class="block text-sm font-medium text-gray-700 mb-2">
                                 Période <span class="text-red-500">*</span>
                             </label>
-                            <input
-                                type="month"
+                            <select
                                 name="period"
                                 id="period"
-                                value="{{ old('period', date('Y-m')) }}"
-                                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-colors duration-200 @error('period') border-red-500 @enderror"
-                                required
-                            >
+                                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200 @error('period') border-red-500 @enderror"
+                                required>
+                                <option value="">Sélectionner une période</option>
+                                @foreach($periods as $periodValue => $periodLabel)
+                                    <option value="{{ $periodValue }}" {{ old('period') == $periodValue ? 'selected' : '' }}>
+                                        {{ $periodLabel }}
+                                    </option>
+                                @endforeach
+                            </select>
                             @error('period')
                                 <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
                             @enderror
-                            <p class="mt-2 text-sm text-gray-500">Format: YYYY-MM (ex: 2024-12)</p>
+                            <p class="mt-1 text-xs text-gray-500">Format: YYYY-MM (ex: 2025-07)</p>
                         </div>
 
-                        {{-- Type d'achat (Online/Offline) --}}
+                        {{-- Recherche distributeur --}}
                         <div>
-                            <label for="online" class="block text-sm font-medium text-gray-700 mb-2">
-                                Type d'achat <span class="text-red-500">*</span>
+                            <label for="distributeur_search" class="block text-sm font-medium text-gray-700 mb-2">
+                                Distributeur <span class="text-red-500">*</span>
                             </label>
-                            <select
-                                name="online"
-                                id="online"
-                                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-colors duration-200 @error('online') border-red-500 @enderror"
-                                required
-                            >
-                                <option value="0" {{ old('online', '0') == '0' ? 'selected' : '' }}>
-                                    Hors ligne (Magasin)
-                                </option>
-                                <option value="1" {{ old('online') == '1' ? 'selected' : '' }}>
-                                    En ligne
-                                </option>
-                            </select>
-                            @error('online')
+                            <div class="relative">
+                                <input
+                                    type="text"
+                                    id="distributeur_search"
+                                    placeholder="Rechercher par nom, prénom ou matricule..."
+                                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200"
+                                    autocomplete="off">
+                                <input type="hidden" name="distributeur_id" id="distributeur_id" value="{{ old('distributeur_id') }}">
+
+                                {{-- Résultats de recherche --}}
+                                <div id="search_results" class="hidden absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                                    {{-- Les résultats seront injectés ici via JavaScript --}}
+                                </div>
+                            </div>
+                            @error('distributeur_id')
                                 <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
                             @enderror
                         </div>
 
-                        {{-- Section Informations calculées --}}
-                        <div class="bg-blue-50 border-l-4 border-blue-400 p-4 rounded-lg mt-6">
-                            <div class="flex">
-                                <div class="flex-shrink-0">
-                                    <svg class="h-5 w-5 text-blue-400" fill="currentColor" viewBox="0 0 20 20">
-                                        <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"/>
-                                    </svg>
-                                </div>
-                                <div class="ml-3">
-                                    <h3 class="text-sm font-medium text-blue-800">Information</h3>
-                                    <p class="mt-2 text-sm text-blue-700">
-                                        Les points unitaires, le prix unitaire et le montant total seront calculés automatiquement
-                                        en fonction du produit sélectionné et de la quantité saisie.
-                                    </p>
-                                </div>
+                        {{-- Achat en ligne --}}
+                        <div>
+                            <div class="flex items-center">
+                                <input
+                                    type="checkbox"
+                                    name="online"
+                                    id="online"
+                                    value="1"
+                                    {{ old('online') ? 'checked' : '' }}
+                                    class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+                                <label for="online" class="ml-2 block text-sm text-gray-900">
+                                    Achat effectué en ligne
+                                </label>
                             </div>
+                            <p class="mt-1 text-xs text-gray-500">Cochez si l'achat a été effectué via la plateforme en ligne</p>
                         </div>
                     </div>
                 </div>
 
-                {{-- Section Distributeur et Produit --}}
+                {{-- Section Produit et calculs --}}
                 <div class="bg-white shadow-lg rounded-lg overflow-hidden h-fit">
-                    <div class="bg-gradient-to-r from-indigo-500 to-indigo-600 px-6 py-4">
+                    <div class="bg-gradient-to-r from-blue-500 to-blue-600 px-6 py-4">
                         <h2 class="text-xl font-semibold text-white flex items-center">
                             <svg class="w-6 h-6 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"/>
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z"/>
                             </svg>
-                            Sélection du distributeur et du produit
+                            Produit et quantité
                         </h2>
                     </div>
                     <div class="p-6 space-y-6">
-                    {{-- Distributeur avec recherche AJAX --}}
-                    <div>
-                        <label for="distributeur_search" class="block text-sm font-medium text-gray-700 mb-2">
-                            Distributeur <span class="text-red-500">*</span>
-                        </label>
-
-                        {{-- Champ de recherche --}}
-                        <div class="relative">
-                            <input
-                                type="text"
-                                id="distributeur_search"
-                                placeholder="Rechercher par matricule, nom ou prénom..."
-                                class="w-full px-4 py-2 pr-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors duration-200"
-                                autocomplete="off"
-                            >
-                            <div class="absolute inset-y-0 right-0 pr-3 flex items-center">
-                                <svg class="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
-                                </svg>
-                            </div>
+                        {{-- Sélection produit --}}
+                        <div>
+                            <label for="products_id" class="block text-sm font-medium text-gray-700 mb-2">
+                                Produit <span class="text-red-500">*</span>
+                            </label>
+                            <select
+                                name="products_id"
+                                id="products_id"
+                                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200 @error('products_id') border-red-500 @enderror"
+                                required>
+                                <option value="">Sélectionner un produit</option>
+                                @foreach($products as $product)
+                                    <option value="{{ $product['id'] }}"
+                                            data-price="{{ $product['price'] }}"
+                                            data-points="{{ $product['points'] }}"
+                                            {{ old('products_id') == $product['id'] ? 'selected' : '' }}>
+                                        {{ $product['name'] }} - {{ number_format($product['price'], 0, ',', ' ') }} FCFA ({{ $product['points'] }} PV)
+                                    </option>
+                                @endforeach
+                            </select>
+                            @error('products_id')
+                                <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
+                            @enderror
                         </div>
 
-                        {{-- Champ caché pour l'ID du distributeur --}}
-                        <input
-                            type="hidden"
-                            name="distributeur_id"
-                            id="distributeur_id"
-                            value="{{ old('distributeur_id') }}"
-                            required
-                        >
-
-                        {{-- Affichage du distributeur sélectionné --}}
-                        <div id="selected_distributeur" class="mt-2 p-3 bg-indigo-50 rounded-lg hidden">
-                            <div class="flex items-center justify-between">
-                                <div>
-                                    <p class="text-sm font-medium text-indigo-900">Distributeur sélectionné :</p>
-                                    <p id="distributeur_display" class="text-sm text-indigo-700"></p>
-                                </div>
-                                <button type="button" onclick="clearDistributeur()" class="text-indigo-600 hover:text-indigo-800">
-                                    <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-                                    </svg>
-                                </button>
-                            </div>
-                        </div>
-
-                        {{-- Liste des résultats de recherche --}}
-                        <div id="distributeur_search_results" class="absolute z-10 w-full mt-1 bg-white rounded-lg shadow-lg hidden max-h-60 overflow-y-auto">
-                            <!-- Les résultats seront ajoutés ici via JavaScript -->
-                        </div>
-
-                        @error('distributeur_id')
-                            <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
-                        @enderror
-                    </div>
-
-                    {{-- Produit --}}
-                    <div>
-                        <label for="products_id" class="block text-sm font-medium text-gray-700 mb-2">
-                            Produit <span class="text-red-500">*</span>
-                        </label>
-                        <select
-                            name="products_id"
-                            id="products_id"
-                            class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors duration-200 @error('products_id') border-red-500 @enderror"
-                            required
-                        >
-                            <option value="">-- Sélectionnez un produit --</option>
-                            @foreach($products as $id => $displayName)
-                                <option value="{{ $id }}" {{ old('products_id') == $id ? 'selected' : '' }}>
-                                    {{ $displayName }}
-                                </option>
-                            @endforeach
-                        </select>
-                        @error('products_id')
-                            <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
-                        @enderror
-                    </div>
-
-                    {{-- Quantité --}}
-                    <div>
-                        <label for="qt" class="block text-sm font-medium text-gray-700 mb-2">
-                            Quantité <span class="text-red-500">*</span>
-                        </label>
-                        <div class="relative">
+                        {{-- Quantité --}}
+                        <div>
+                            <label for="qt" class="block text-sm font-medium text-gray-700 mb-2">
+                                Quantité <span class="text-red-500">*</span>
+                            </label>
                             <input
                                 type="number"
                                 name="qt"
                                 id="qt"
-                                value="{{ old('qt', 1) }}"
                                 min="1"
-                                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors duration-200 @error('qt') border-red-500 @enderror"
-                                required
-                            >
-                            <div class="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
-                                <span class="text-gray-500 sm:text-sm">unité(s)</span>
+                                value="{{ old('qt', 1) }}"
+                                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200 @error('qt') border-red-500 @enderror"
+                                required>
+                            @error('qt')
+                                <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
+                            @enderror
+                        </div>
+
+                        {{-- Aperçu des calculs --}}
+                        <div class="bg-gray-50 rounded-lg p-4">
+                            <h3 class="text-sm font-medium text-gray-900 mb-3">Aperçu des calculs</h3>
+                            <div class="space-y-2 text-sm">
+                                <div class="flex justify-between">
+                                    <span class="text-gray-600">Prix unitaire :</span>
+                                    <span class="font-medium" id="preview_price">0 FCFA</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="text-gray-600">Points par unité :</span>
+                                    <span class="font-medium text-blue-600" id="preview_points_unit">0 PV</span>
+                                </div>
+                                <div class="border-t pt-2 mt-2">
+                                    <div class="flex justify-between">
+                                        <span class="text-gray-600">Total points :</span>
+                                        <span class="font-medium text-blue-600" id="preview_points">0 PV</span>
+                                    </div>
+                                    <div class="flex justify-between">
+                                        <span class="text-gray-600">Montant total :</span>
+                                        <span class="font-semibold text-green-600 text-lg" id="preview_total">0 FCFA</span>
+                                    </div>
+                                </div>
                             </div>
                         </div>
-                        @error('qt')
-                            <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
-                        @enderror
-                    </div>
                     </div>
                 </div>
             </div>
 
             {{-- Boutons d'action --}}
-            <div class="flex items-center justify-end space-x-4 pt-4">
-                <a href="{{ route('admin.achats.index') }}" class="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors duration-200">
+            <div class="flex items-center justify-end space-x-4 pt-6 border-t border-gray-200">
+                <a href="{{ route('admin.achats.index') }}" class="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors duration-200">
                     Annuler
                 </a>
-                <button type="submit" class="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition-colors duration-200">
-                    <svg class="w-5 h-5 mr-2 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                <button type="submit" class="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition-colors duration-200 flex items-center">
+                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
                     </svg>
                     Enregistrer l'achat
                 </button>
             </div>
         </form>
-
-        {{-- Note supplémentaire --}}
-        <div class="mt-8 p-4 bg-gray-50 rounded-lg">
-            <p class="text-sm text-gray-600">
-                <strong>Note :</strong> Une fois l'achat enregistré, vous pourrez le consulter dans la liste des achats.
-                Les calculs de bonus et de points seront automatiquement mis à jour selon les règles définies dans le système.
-            </p>
-        </div>
     </div>
 </div>
 
-{{-- Script pour améliorer l'UX (optionnel) --}}
+{{-- Scripts pour la recherche de distributeur et calculs --}}
 @push('scripts')
 <script>
-    // Script pour la recherche AJAX du distributeur
-    let distributeurSearchTimeout;
-    const distributeurSearchInput = document.getElementById('distributeur_search');
-    const distributeurSearchResults = document.getElementById('distributeur_search_results');
-    const selectedDistributeurDiv = document.getElementById('selected_distributeur');
-    const distributeurDisplay = document.getElementById('distributeur_display');
+    // Recherche de distributeur
+    let searchTimeout;
+    const searchInput = document.getElementById('distributeur_search');
+    const searchResults = document.getElementById('search_results');
     const distributeurIdInput = document.getElementById('distributeur_id');
 
-    // Gestion de la recherche distributeur
-    distributeurSearchInput.addEventListener('input', function() {
-        clearTimeout(distributeurSearchTimeout);
+    searchInput.addEventListener('input', function() {
+        clearTimeout(searchTimeout);
         const query = this.value.trim();
 
         if (query.length < 2) {
-            distributeurSearchResults.classList.add('hidden');
-            distributeurSearchResults.innerHTML = '';
+            searchResults.classList.add('hidden');
+            searchResults.innerHTML = '';
             return;
         }
 
         // Afficher un loader
-        distributeurSearchResults.innerHTML = `
+        searchResults.innerHTML = `
             <div class="p-4 text-center">
                 <svg class="animate-spin h-5 w-5 mx-auto text-gray-500" fill="none" viewBox="0 0 24 24">
                     <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
@@ -337,93 +295,85 @@
                 <p class="mt-2 text-sm text-gray-500">Recherche en cours...</p>
             </div>
         `;
-        distributeurSearchResults.classList.remove('hidden');
+        searchResults.classList.remove('hidden');
 
-        // Délai avant la recherche
-        distributeurSearchTimeout = setTimeout(() => {
-            searchDistributeurs(query);
+        searchTimeout = setTimeout(() => {
+            fetch(`{{ route('admin.distributeurs.search') }}?q=${encodeURIComponent(query)}`)
+            .then(response => response.json())
+            .then(data => {
+                searchResults.innerHTML = '';
+                if (data.length === 0) {
+                    searchResults.innerHTML = '<div class="p-3 text-sm text-gray-500">Aucun distributeur trouvé</div>';
+                } else {
+                    data.forEach(distributeur => {
+                        const div = document.createElement('div');
+                        div.className = 'p-3 hover:bg-gray-50 cursor-pointer border-b border-gray-100 last:border-b-0';
+                        div.innerHTML = `
+                            <div class="text-sm font-medium text-gray-900">${distributeur.distributeur_id} - ${distributeur.pnom_distributeur} ${distributeur.nom_distributeur}</div>
+                            ${distributeur.tel_distributeur ? `<div class="text-xs text-gray-500">${distributeur.tel_distributeur}</div>` : ''}
+                        `;
+                        div.addEventListener('click', () => selectDistributeur(distributeur));
+                        searchResults.appendChild(div);
+                    });
+                }
+                searchResults.classList.remove('hidden');
+            })
+            .catch(error => {
+                console.error('Erreur lors de la recherche:', error);
+                searchResults.innerHTML = '<div class="p-3 text-sm text-red-500">Erreur lors de la recherche</div>';
+                searchResults.classList.remove('hidden');
+            });
         }, 300);
     });
 
-    // Fonction de recherche AJAX pour distributeurs
-    function searchDistributeurs(query) {
-        fetch(`{{ route('admin.distributeurs.search') }}?q=${encodeURIComponent(query)}`, {
-            headers: {
-                'X-Requested-With': 'XMLHttpRequest',
-                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
-            }
-        })
-        .then(response => response.json())
-        .then(data => {
-            distributeurSearchResults.innerHTML = '';
-
-            if (data.length === 0) {
-                distributeurSearchResults.innerHTML = `
-                    <div class="p-4 text-center text-gray-500">
-                        Aucun distributeur trouvé
-                    </div>
-                `;
-            } else {
-                data.forEach(distributeur => {
-                    const item = document.createElement('div');
-                    item.className = 'px-4 py-3 hover:bg-gray-50 cursor-pointer border-b last:border-b-0';
-                    item.innerHTML = `
-                        <div class="font-medium text-gray-900">
-                            #${distributeur.distributeur_id} - ${distributeur.pnom_distributeur} ${distributeur.nom_distributeur}
-                        </div>
-                        ${distributeur.tel_distributeur ? `<div class="text-sm text-gray-500">${distributeur.tel_distributeur}</div>` : ''}
-                    `;
-                    item.addEventListener('click', () => selectDistributeur(distributeur));
-                    distributeurSearchResults.appendChild(item);
-                });
-            }
-        })
-        .catch(error => {
-            distributeurSearchResults.innerHTML = `
-                <div class="p-4 text-center text-red-500">
-                    Erreur lors de la recherche
-                </div>
-            `;
-        });
-    }
-
-    // Sélectionner un distributeur
     function selectDistributeur(distributeur) {
         distributeurIdInput.value = distributeur.id;
-        distributeurDisplay.textContent = `#${distributeur.distributeur_id} - ${distributeur.pnom_distributeur} ${distributeur.nom_distributeur}`;
-        selectedDistributeurDiv.classList.remove('hidden');
-        distributeurSearchInput.value = '';
-        distributeurSearchResults.classList.add('hidden');
-        distributeurSearchResults.innerHTML = '';
-    }
-
-    // Effacer la sélection
-    function clearDistributeur() {
-        distributeurIdInput.value = '';
-        selectedDistributeurDiv.classList.add('hidden');
-        distributeurSearchInput.value = '';
+        searchInput.value = `${distributeur.distributeur_id} - ${distributeur.pnom_distributeur} ${distributeur.nom_distributeur}`;
+        searchResults.classList.add('hidden');
     }
 
     // Fermer les résultats quand on clique ailleurs
     document.addEventListener('click', function(e) {
-        if (!distributeurSearchInput.contains(e.target) && !distributeurSearchResults.contains(e.target)) {
-            distributeurSearchResults.classList.add('hidden');
+        if (!searchInput.contains(e.target) && !searchResults.contains(e.target)) {
+            searchResults.classList.add('hidden');
         }
     });
 
-    // Si un distributeur était sélectionné (old value), l'afficher
-    @if(old('distributeur_id'))
-        fetch(`{{ route('admin.distributeurs.show', old('distributeur_id')) }}`, {
-            headers: {
-                'X-Requested-With': 'XMLHttpRequest',
-            }
-        })
-        .then(response => response.json())
-        .then(distributeur => {
-            selectDistributeur(distributeur);
-        });
-    @endif
+    // Calcul automatique
+    const productSelect = document.getElementById('products_id');
+    const quantityInput = document.getElementById('qt');
+    const previewPrice = document.getElementById('preview_price');
+    const previewPointsUnit = document.getElementById('preview_points_unit');
+    const previewTotal = document.getElementById('preview_total');
+    const previewPoints = document.getElementById('preview_points');
+
+    function updateCalculation() {
+        const selectedOption = productSelect.options[productSelect.selectedIndex];
+        const quantity = parseInt(quantityInput.value) || 0;
+
+        if (selectedOption && selectedOption.value) {
+            const price = parseFloat(selectedOption.dataset.price) || 0;
+            const points = parseInt(selectedOption.dataset.points) || 0;
+            const total = price * quantity;
+            const totalPoints = points * quantity;
+
+            previewPrice.textContent = new Intl.NumberFormat('fr-FR').format(price) + ' FCFA';
+            previewPointsUnit.textContent = points + ' PV';
+            previewTotal.textContent = new Intl.NumberFormat('fr-FR').format(total) + ' FCFA';
+            previewPoints.textContent = totalPoints + ' PV';
+        } else {
+            previewPrice.textContent = '0 FCFA';
+            previewPointsUnit.textContent = '0 PV';
+            previewTotal.textContent = '0 FCFA';
+            previewPoints.textContent = '0 PV';
+        }
+    }
+
+    productSelect.addEventListener('change', updateCalculation);
+    quantityInput.addEventListener('input', updateCalculation);
+
+    // Calcul initial si des valeurs sont déjà sélectionnées
+    updateCalculation();
 </script>
 @endpush
-
 @endsection

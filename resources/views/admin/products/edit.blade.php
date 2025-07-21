@@ -32,7 +32,7 @@
         {{-- Titre principal --}}
         <div class="mb-8">
             <h1 class="text-3xl font-bold text-gray-900">Modifier le produit</h1>
-            <p class="mt-2 text-gray-600">Modifiez les informations du produit ci-dessous.</p>
+            <p class="mt-2 text-gray-600">Modifiez les informations du produit "{{ $product->nom_produit }}" ci-dessous.</p>
         </div>
 
         {{-- Affichage des erreurs --}}
@@ -63,178 +63,184 @@
             @csrf
             @method('PUT')
 
+            {{-- Sections côte à côte sur grand écran --}}
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {{-- Section Informations de base --}}
+                {{-- Section Informations produit --}}
                 <div class="bg-white shadow-lg rounded-lg overflow-hidden h-fit">
-                    <div class="bg-gradient-to-r from-indigo-500 to-indigo-600 px-6 py-4">
+                    <div class="bg-gradient-to-r from-blue-500 to-blue-600 px-6 py-4">
                         <h2 class="text-xl font-semibold text-white flex items-center">
                             <svg class="w-6 h-6 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z"/>
                             </svg>
-                            Informations de base
+                            Informations produit
                         </h2>
                     </div>
                     <div class="p-6 space-y-6">
-                        {{-- Code produit --}}
-                        <div>
-                            <label for="code_product" class="block text-sm font-medium text-gray-700 mb-2">
-                                Code produit <span class="text-red-500">*</span>
-                            </label>
-                            <input
-                                type="text"
-                                name="code_product"
-                                id="code_product"
-                                value="{{ old('code_product', $product->code_product) }}"
-                                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors duration-200 @error('code_product') border-red-500 @enderror"
-                                placeholder="Ex: PROD001"
-                                required
-                                maxlength="50"
-                            >
-                            @error('code_product')
-                                <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
-                            @enderror
-                        </div>
-
-                        {{-- Nom du produit --}}
-                        <div>
-                            <label for="nom_produit" class="block text-sm font-medium text-gray-700 mb-2">
-                                Nom du produit <span class="text-red-500">*</span>
-                            </label>
-                            <input
-                                type="text"
-                                name="nom_produit"
-                                id="nom_produit"
-                                value="{{ old('nom_produit', $product->nom_produit) }}"
-                                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors duration-200 @error('nom_produit') border-red-500 @enderror"
-                                placeholder="Entrez le nom du produit"
-                                required
-                                maxlength="255"
-                            >
-                            @error('nom_produit')
-                                <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
-                            @enderror
-                        </div>
-
-                        {{-- Prix --}}
-                        <div>
-                            <label for="prix_product" class="block text-sm font-medium text-gray-700 mb-2">
-                                Prix (XAF) <span class="text-red-500">*</span>
-                            </label>
-                            <div class="relative">
+                        <div class="space-y-6">
+                            {{-- Code produit --}}
+                            <div>
+                                <label for="code_product" class="block text-sm font-medium text-gray-700 mb-2">
+                                    Code produit <span class="text-red-500">*</span>
+                                </label>
                                 <input
-                                    type="number"
-                                    name="prix_product"
-                                    id="prix_product"
-                                    value="{{ old('prix_product', $product->prix_product) }}"
-                                    step="0.01"
-                                    min="0"
-                                    class="w-full px-4 py-2 pr-16 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors duration-200 @error('prix_product') border-red-500 @enderror"
-                                    placeholder="0"
-                                    required
-                                >
-                                <div class="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
-                                    <span class="text-gray-500 sm:text-sm">XAF</span>
-                                </div>
+                                    type="text"
+                                    name="code_product"
+                                    id="code_product"
+                                    value="{{ old('code_product', $product->code_product) }}"
+                                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200 @error('code_product') border-red-500 @enderror"
+                                    placeholder="Ex: PROD-001"
+                                    required>
+                                @error('code_product')
+                                    <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
+                                @enderror
                             </div>
-                            @error('prix_product')
-                                <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
-                            @enderror
-                        </div>
 
-                        {{-- Description --}}
-                        <div>
-                            <label for="description" class="block text-sm font-medium text-gray-700 mb-2">
-                                Description
-                            </label>
-                            <textarea
-                                name="description"
-                                id="description"
-                                rows="4"
-                                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors duration-200 @error('description') border-red-500 @enderror"
-                                placeholder="Description détaillée du produit (optionnel)"
-                                maxlength="1000"
-                            >{{ old('description', $product->description) }}</textarea>
-                            @error('description')
-                                <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
-                            @enderror
-                            <p class="mt-1 text-sm text-gray-500">Maximum 1000 caractères</p>
+                            {{-- Nom du produit --}}
+                            <div>
+                                <label for="nom_produit" class="block text-sm font-medium text-gray-700 mb-2">
+                                    Nom du produit <span class="text-red-500">*</span>
+                                </label>
+                                <input
+                                    type="text"
+                                    name="nom_produit"
+                                    id="nom_produit"
+                                    value="{{ old('nom_produit', $product->nom_produit) }}"
+                                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200 @error('nom_produit') border-red-500 @enderror"
+                                    placeholder="Entrez le nom du produit"
+                                    required>
+                                @error('nom_produit')
+                                    <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
+                                @enderror
+                            </div>
+
+                            {{-- Description --}}
+                            <div>
+                                <label for="description" class="block text-sm font-medium text-gray-700 mb-2">
+                                    Description
+                                </label>
+                                <textarea
+                                    name="description"
+                                    id="description"
+                                    rows="4"
+                                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200 @error('description') border-red-500 @enderror"
+                                    placeholder="Description détaillée du produit...">{{ old('description', $product->description) }}</textarea>
+                                @error('description')
+                                    <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
+                                @enderror
+                            </div>
                         </div>
                     </div>
                 </div>
 
-                {{-- Section Catégorie et Points --}}
+                {{-- Section Prix et classification --}}
                 <div class="bg-white shadow-lg rounded-lg overflow-hidden h-fit">
-                    <div class="bg-gradient-to-r from-purple-500 to-purple-600 px-6 py-4">
+                    <div class="bg-gradient-to-r from-green-500 to-green-600 px-6 py-4">
                         <h2 class="text-xl font-semibold text-white flex items-center">
                             <svg class="w-6 h-6 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"/>
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1"/>
                             </svg>
-                            Catégorie et Points
+                            Prix et classification
                         </h2>
                     </div>
                     <div class="p-6 space-y-6">
-                        {{-- Catégorie --}}
-                        <div>
-                            <label for="category_id" class="block text-sm font-medium text-gray-700 mb-2">
-                                Catégorie
-                            </label>
-                            <select
-                                name="category_id"
-                                id="category_id"
-                                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-colors duration-200 @error('category_id') border-red-500 @enderror"
-                            >
-                                <option value="">-- Sélectionnez une catégorie --</option>
-                                @foreach($categories as $id => $name)
-                                    <option value="{{ $id }}" {{ old('category_id', $product->category_id) == $id ? 'selected' : '' }}>
-                                        {{ $name }}
-                                    </option>
-                                @endforeach
-                            </select>
-                            @error('category_id')
-                                <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
-                            @enderror
-                            <p class="mt-2 text-sm text-gray-500">
-                                La catégorie est optionnelle. Elle permet de classifier les produits.
-                            </p>
-                        </div>
+                        <div class="space-y-6">
+                            {{-- Prix --}}
+                            <div>
+                                <label for="prix_product" class="block text-sm font-medium text-gray-700 mb-2">
+                                    Prix du produit (FCFA) <span class="text-red-500">*</span>
+                                </label>
+                                <div class="relative">
+                                    <input
+                                        type="number"
+                                        name="prix_product"
+                                        id="prix_product"
+                                        value="{{ old('prix_product', $product->prix_product) }}"
+                                        step="0.01"
+                                        min="0"
+                                        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200 @error('prix_product') border-red-500 @enderror"
+                                        placeholder="0.00"
+                                        required>
+                                    <div class="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                                        <span class="text-gray-500 text-sm">FCFA</span>
+                                    </div>
+                                </div>
+                                @error('prix_product')
+                                    <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
+                                @enderror
+                            </div>
 
-                        {{-- Points Valeur --}}
-                        <div>
-                            <label for="pointvaleur_id" class="block text-sm font-medium text-gray-700 mb-2">
-                                Points Valeur (PV) <span class="text-red-500">*</span>
-                            </label>
-                            <select
-                                name="pointvaleur_id"
-                                id="pointvaleur_id"
-                                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-colors duration-200 @error('pointvaleur_id') border-red-500 @enderror"
-                                required
-                            >
-                                <option value="">-- Sélectionnez les points --</option>
-                                @foreach($pointValeurs as $id => $points)
-                                    <option value="{{ $id }}" {{ old('pointvaleur_id', $product->pointvaleur_id) == $id ? 'selected' : '' }}>
-                                        {{ $points }} PV
-                                    </option>
-                                @endforeach
-                            </select>
-                            @error('pointvaleur_id')
-                                <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
-                            @enderror
-                            <p class="mt-2 text-sm text-gray-500">
-                                Les points valeur sont utilisés pour calculer les bonus des distributeurs.
-                            </p>
+                            {{-- Catégorie --}}
+                            <div>
+                                <label for="category_id" class="block text-sm font-medium text-gray-700 mb-2">
+                                    Catégorie
+                                </label>
+                                <select
+                                    name="category_id"
+                                    id="category_id"
+                                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200 @error('category_id') border-red-500 @enderror">
+                                    <option value="">Choisir une catégorie (optionnel)</option>
+                                    @foreach($categories as $id => $name)
+                                        <option value="{{ $id }}" {{ old('category_id', $product->category_id) == $id ? 'selected' : '' }}>
+                                            {{ $name }}
+                                        </option>
+                                    @endforeach
+                                </select>
+                                @error('category_id')
+                                    <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
+                                @enderror
+                            </div>
+
+                            {{-- Points valeur --}}
+                            <div>
+                                <label for="pointvaleur_id" class="block text-sm font-medium text-gray-700 mb-2">
+                                    Valeur en points (PV) <span class="text-red-500">*</span>
+                                </label>
+                                <select
+                                    name="pointvaleur_id"
+                                    id="pointvaleur_id"
+                                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200 @error('pointvaleur_id') border-red-500 @enderror"
+                                    required>
+                                    <option value="">Sélectionner les points</option>
+                                    @foreach($pointValeurs as $id => $points)
+                                        <option value="{{ $id }}" {{ old('pointvaleur_id', $product->pointvaleur_id) == $id ? 'selected' : '' }}>
+                                            {{ $points }} PV
+                                        </option>
+                                    @endforeach
+                                </select>
+                                @error('pointvaleur_id')
+                                    <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
+                                @enderror
+                                <p class="mt-2 text-sm text-gray-500">
+                                    <svg class="w-4 h-4 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                    </svg>
+                                    Les points valeur sont utilisés pour le calcul des commissions
+                                </p>
+                            </div>
+
+                            {{-- Informations de modification --}}
+                            <div class="bg-gray-50 rounded-lg p-4">
+                                <h3 class="text-sm font-medium text-gray-900 mb-2">Informations de suivi</h3>
+                                <div class="text-sm text-gray-600 space-y-1">
+                                    <p>Créé le : {{ $product->created_at ? $product->created_at->format('d/m/Y à H:i') : 'Non défini' }}</p>
+                                    @if($product->updated_at && $product->created_at && $product->updated_at != $product->created_at)
+                                        <p>Modifié le : {{ $product->updated_at->format('d/m/Y à H:i') }}</p>
+                                    @endif
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
             </div>
 
             {{-- Boutons d'action --}}
-            <div class="flex items-center justify-end space-x-4 pt-4">
-                <a href="{{ route('admin.products.show', $product) }}" class="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors duration-200">
+            <div class="flex items-center justify-end space-x-4 pt-6 border-t border-gray-200">
+                <a href="{{ route('admin.products.show', $product) }}" class="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors duration-200">
                     Annuler
                 </a>
-                <button type="submit" class="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition-colors duration-200">
-                    <svg class="w-5 h-5 mr-2 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                <button type="submit" class="px-6 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500 transition-colors duration-200 flex items-center">
+                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
                     </svg>
                     Enregistrer les modifications
                 </button>

@@ -32,7 +32,7 @@
         {{-- Titre principal --}}
         <div class="mb-8">
             <h1 class="text-3xl font-bold text-gray-900">Modifier l'achat #{{ $achat->id }}</h1>
-            <p class="mt-2 text-gray-600">Modifiez les informations de l'achat ci-dessous.</p>
+            <p class="mt-2 text-gray-600">Modifiez les informations de l'achat effectué par {{ $achat->distributeur->pnom_distributeur }} {{ $achat->distributeur->nom_distributeur }}.</p>
         </div>
 
         {{-- Messages d'erreur --}}
@@ -59,183 +59,179 @@
         @endif
 
         {{-- Formulaire principal --}}
-        <form action="{{ route('admin.achats.update', $achat) }}" method="POST" class="space-y-8">
+        <form method="POST" action="{{ route('admin.achats.update', $achat) }}" class="space-y-8">
             @csrf
             @method('PUT')
 
-            {{-- Informations de base --}}
-            <div class="bg-white shadow-sm rounded-lg p-6">
-                <h2 class="text-lg font-semibold text-gray-900 mb-6">Informations de l'achat</h2>
-
-                <div class="grid grid-cols-1 gap-6 sm:grid-cols-2">
-                    {{-- Période --}}
-                    <div>
-                        <label for="period" class="block text-sm font-medium text-gray-700">
-                            Période <span class="text-red-500">*</span>
-                        </label>
-                        <select name="period"
-                                id="period"
-                                required
-                                class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm @error('period') border-red-300 @enderror">
-                            @foreach($periods as $value => $label)
-                                <option value="{{ $value }}" {{ old('period', $achat->period) == $value ? 'selected' : '' }}>
-                                    {{ $label }}
-                                </option>
-                            @endforeach
-                        </select>
-                        @error('period')
-                            <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
-                        @enderror
-                    </div>
-
-                    {{-- Type d'achat --}}
-                    <div>
-                        <label for="online" class="block text-sm font-medium text-gray-700">
-                            Type d'achat
-                        </label>
-                        <select name="online"
-                                id="online"
-                                class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
-                            <option value="0" {{ old('online', $achat->online) == '0' ? 'selected' : '' }}>Achat physique</option>
-                            <option value="1" {{ old('online', $achat->online) == '1' ? 'selected' : '' }}>Achat en ligne</option>
-                        </select>
-                    </div>
-                </div>
-            </div>
-
-            {{-- Sélection du distributeur --}}
-            <div class="bg-white shadow-sm rounded-lg p-6">
-                <h2 class="text-lg font-semibold text-gray-900 mb-6">Distributeur</h2>
-
-                <div class="relative">
-                    <label for="distributeur_search" class="block text-sm font-medium text-gray-700 mb-2">
-                        Rechercher un distributeur <span class="text-red-500">*</span>
-                    </label>
-
-                    {{-- Distributeur actuel --}}
-                    <div class="mb-3 p-3 bg-blue-50 rounded-lg">
-                        <p class="text-sm text-blue-800">
-                            <strong>Distributeur actuel :</strong>
-                            #{{ $achat->distributeur->distributeur_id }} -
-                            {{ $achat->distributeur->pnom_distributeur }} {{ $achat->distributeur->nom_distributeur }}
-                        </p>
-                    </div>
-
-                    {{-- Champ caché pour l'ID --}}
-                    <input type="hidden" name="distributeur_id" id="distributeur_id" value="{{ old('distributeur_id', $achat->distributeur_id) }}" required>
-
-                    {{-- Champ de recherche --}}
-                    <div class="relative">
-                        <input
-                            type="text"
-                            id="distributeur_search"
-                            placeholder="Tapez le nom, prénom ou matricule..."
-                            class="w-full px-4 py-2 pr-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors duration-200 @error('distributeur_id') border-red-500 @enderror"
-                            autocomplete="off"
-                            value="{{ $achat->distributeur->distributeur_id }} - {{ $achat->distributeur->pnom_distributeur }} {{ $achat->distributeur->nom_distributeur }}"
-                        >
-                        <div class="absolute inset-y-0 right-0 flex items-center pr-3">
-                            <svg class="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+            {{-- Sections côte à côte sur grand écran --}}
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {{-- Section Informations de base --}}
+                <div class="bg-white shadow-lg rounded-lg overflow-hidden h-fit">
+                    <div class="bg-gradient-to-r from-green-500 to-green-600 px-6 py-4">
+                        <h2 class="text-xl font-semibold text-white flex items-center">
+                            <svg class="w-6 h-6 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
                             </svg>
+                            Informations de base
+                        </h2>
+                    </div>
+                    <div class="p-6 space-y-6">
+                        {{-- Période --}}
+                        <div>
+                            <label for="period" class="block text-sm font-medium text-gray-700 mb-2">
+                                Période <span class="text-red-500">*</span>
+                            </label>
+                            <input
+                                type="month"
+                                name="period"
+                                id="period"
+                                value="{{ old('period', $achat->period) }}"
+                                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200 @error('period') border-red-500 @enderror"
+                                required>
+                            @error('period')
+                                <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
+                            @enderror
+                            <p class="mt-1 text-xs text-gray-500">Format: YYYY-MM (ex: 2025-07)</p>
+                        </div>
+
+                        {{-- Distributeur (non modifiable) --}}
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">
+                                Distributeur
+                            </label>
+                            <div class="w-full px-4 py-2 bg-gray-50 border border-gray-300 rounded-lg text-gray-700">
+                                {{ $achat->distributeur->distributeur_id }} - {{ $achat->distributeur->pnom_distributeur }} {{ $achat->distributeur->nom_distributeur }}
+                            </div>
+                            <p class="mt-1 text-xs text-gray-500">Le distributeur ne peut pas être modifié</p>
+                        </div>
+
+                        {{-- Achat en ligne --}}
+                        <div>
+                            <div class="flex items-center">
+                                <input
+                                    type="checkbox"
+                                    name="online"
+                                    id="online"
+                                    value="1"
+                                    {{ old('online', $achat->online) ? 'checked' : '' }}
+                                    class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+                                <label for="online" class="ml-2 block text-sm text-gray-900">
+                                    Achat effectué en ligne
+                                </label>
+                            </div>
+                            <p class="mt-1 text-xs text-gray-500">Cochez si l'achat a été effectué via la plateforme en ligne</p>
+                        </div>
+
+                        {{-- Informations de suivi --}}
+                        <div class="bg-gray-50 rounded-lg p-4">
+                            <h3 class="text-sm font-medium text-gray-900 mb-2">Informations de suivi</h3>
+                            <div class="text-sm text-gray-600 space-y-1">
+                                <p>Créé le : {{ $achat->created_at ? $achat->created_at->format('d/m/Y à H:i') : 'Non défini' }}</p>
+                                @if($achat->updated_at && $achat->created_at && $achat->updated_at != $achat->created_at)
+                                    <p>Modifié le : {{ $achat->updated_at->format('d/m/Y à H:i') }}</p>
+                                @endif
+                            </div>
                         </div>
                     </div>
-
-                    {{-- Zone de résultats --}}
-                    <div id="distributeur_search_results" class="absolute z-10 w-full mt-1 bg-white rounded-lg shadow-lg hidden max-h-60 overflow-y-auto">
-                        <!-- Les résultats seront ajoutés ici via JavaScript -->
-                    </div>
-
-                    @error('distributeur_id')
-                        <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
-                    @enderror
                 </div>
-            </div>
 
-            {{-- Sélection du produit et quantité --}}
-            <div class="bg-white shadow-sm rounded-lg p-6">
-                <h2 class="text-lg font-semibold text-gray-900 mb-6">Produit et quantité</h2>
-
-                <div class="grid grid-cols-1 gap-6 sm:grid-cols-2">
-                    {{-- Produit --}}
-                    <div>
-                        <label for="products_id" class="block text-sm font-medium text-gray-700">
-                            Produit <span class="text-red-500">*</span>
-                        </label>
-                        <select name="products_id"
-                                id="products_id"
-                                required
-                                class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm @error('products_id') border-red-300 @enderror">
-                            <option value="">-- Sélectionnez un produit --</option>
-                            @foreach($products as $product)
-                                <option value="{{ $product['id'] }}"
-                                        data-price="{{ $product['price'] }}"
-                                        data-points="{{ $product['points'] }}"
-                                        {{ old('products_id', $achat->products_id) == $product['id'] ? 'selected' : '' }}>
-                                    {{ $product['name'] }}
-                                </option>
-                            @endforeach
-                        </select>
-                        @error('products_id')
-                            <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
-                        @enderror
+                {{-- Section Produit et calculs --}}
+                <div class="bg-white shadow-lg rounded-lg overflow-hidden h-fit">
+                    <div class="bg-gradient-to-r from-blue-500 to-blue-600 px-6 py-4">
+                        <h2 class="text-xl font-semibold text-white flex items-center">
+                            <svg class="w-6 h-6 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z"/>
+                            </svg>
+                            Produit et quantité
+                        </h2>
                     </div>
+                    <div class="p-6 space-y-6">
+                        {{-- Produit actuel (non modifiable) --}}
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">
+                                Produit
+                            </label>
+                            <div class="w-full px-4 py-2 bg-gray-50 border border-gray-300 rounded-lg text-gray-700">
+                                {{ $achat->product->nom_produit }} ({{ $achat->product->code_product }})
+                            </div>
+                            <p class="mt-1 text-xs text-gray-500">Le produit ne peut pas être modifié</p>
+                        </div>
 
-                    {{-- Quantité --}}
-                    <div>
-                        <label for="qt" class="block text-sm font-medium text-gray-700">
-                            Quantité <span class="text-red-500">*</span>
-                        </label>
-                        <input type="number"
-                               name="qt"
-                               id="qt"
-                               value="{{ old('qt', $achat->qt) }}"
-                               min="1"
-                               required
-                               class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm @error('qt') border-red-300 @enderror"
-                               placeholder="1">
-                        @error('qt')
-                            <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
-                        @enderror
+                        {{-- Quantité --}}
+                        <div>
+                            <label for="qt" class="block text-sm font-medium text-gray-700 mb-2">
+                                Quantité <span class="text-red-500">*</span>
+                            </label>
+                            <input
+                                type="number"
+                                name="qt"
+                                id="qt"
+                                min="1"
+                                value="{{ old('qt', $achat->qt) }}"
+                                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200 @error('qt') border-red-500 @enderror"
+                                required>
+                            @error('qt')
+                                <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
+                            @enderror
+                        </div>
+
+                        {{-- Prix et points (non modifiables) --}}
+                        <div class="space-y-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">
+                                    Prix unitaire
+                                </label>
+                                <div class="w-full px-4 py-2 bg-gray-50 border border-gray-300 rounded-lg text-gray-700">
+                                    {{ number_format($achat->prix_unitaire_achat, 0, ',', ' ') }} FCFA
+                                </div>
+                            </div>
+
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">
+                                    Points par unité
+                                </label>
+                                <div class="w-full px-4 py-2 bg-gray-50 border border-gray-300 rounded-lg text-gray-700">
+                                    {{ number_format($achat->points_unitaire_achat, 2) }} PV
+                                </div>
+                            </div>
+                        </div>
+
+                        {{-- Aperçu des calculs --}}
+                        <div class="bg-gray-50 rounded-lg p-4">
+                            <h3 class="text-sm font-medium text-gray-900 mb-3">Aperçu des calculs</h3>
+                            <div class="space-y-2 text-sm">
+                                <div class="flex justify-between">
+                                    <span class="text-gray-600">Prix unitaire :</span>
+                                    <span class="font-medium">{{ number_format($achat->prix_unitaire_achat, 0, ',', ' ') }} FCFA</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="text-gray-600">Points par unité :</span>
+                                    <span class="font-medium text-blue-600">{{ number_format($achat->points_unitaire_achat, 2) }} PV</span>
+                                </div>
+                                <div class="border-t pt-2 mt-2">
+                                    <div class="flex justify-between">
+                                        <span class="text-gray-600">Total points :</span>
+                                        <span class="font-medium text-blue-600" id="preview_points">{{ number_format($achat->qt * $achat->points_unitaire_achat, 2) }} PV</span>
+                                    </div>
+                                    <div class="flex justify-between">
+                                        <span class="text-gray-600">Montant total :</span>
+                                        <span class="font-semibold text-green-600 text-lg" id="preview_total">{{ number_format($achat->qt * $achat->prix_unitaire_achat, 0, ',', ' ') }} FCFA</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
-                </div>
-
-                {{-- Aperçu du calcul --}}
-                <div id="calculation_preview" class="mt-6 p-4 bg-gray-50 rounded-lg">
-                    <h3 class="text-sm font-medium text-gray-700 mb-3">Aperçu du calcul</h3>
-                    <dl class="grid grid-cols-1 gap-4 sm:grid-cols-3">
-                        <div>
-                            <dt class="text-xs text-gray-500">Prix unitaire</dt>
-                            <dd class="mt-1 text-sm font-medium text-gray-900" id="preview_price">
-                                {{ number_format($achat->prix_unitaire_achat, 0, ',', ' ') }} XAF
-                            </dd>
-                        </div>
-                        <div>
-                            <dt class="text-xs text-gray-500">Montant total</dt>
-                            <dd class="mt-1 text-sm font-medium text-gray-900" id="preview_total">
-                                {{ number_format($achat->montant_total_ligne, 0, ',', ' ') }} XAF
-                            </dd>
-                        </div>
-                        <div>
-                            <dt class="text-xs text-gray-500">Points totaux</dt>
-                            <dd class="mt-1 text-sm font-medium text-green-600" id="preview_points">
-                                {{ $achat->points_unitaire_achat * $achat->qt }} PV
-                            </dd>
-                        </div>
-                    </dl>
                 </div>
             </div>
 
             {{-- Boutons d'action --}}
-            <div class="flex justify-end space-x-3">
-                <a href="{{ route('admin.achats.show', $achat) }}"
-                   class="bg-white py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+            <div class="flex items-center justify-end space-x-4 pt-6 border-t border-gray-200">
+                <a href="{{ route('admin.achats.show', $achat) }}" class="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors duration-200">
                     Annuler
                 </a>
-                <button type="submit"
-                        class="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                <button type="submit" class="px-6 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500 transition-colors duration-200 flex items-center">
                     <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
                     </svg>
                     Enregistrer les modifications
                 </button>
@@ -244,97 +240,30 @@
     </div>
 </div>
 
+{{-- Script pour le calcul en temps réel --}}
 @push('scripts')
 <script>
-    // Recherche de distributeur
-    let searchTimeout;
-    const searchInput = document.getElementById('distributeur_search');
-    const searchResults = document.getElementById('distributeur_search_results');
-    const distributeurIdInput = document.getElementById('distributeur_id');
-
-    searchInput.addEventListener('input', function(e) {
-        clearTimeout(searchTimeout);
-        const query = e.target.value.trim();
-
-        if (query.length < 2) {
-            searchResults.classList.add('hidden');
-            return;
-        }
-
-        searchTimeout = setTimeout(() => {
-            fetch(`{{ route('admin.distributeurs.search') }}?q=${encodeURIComponent(query)}`, {
-                headers: {
-                    'X-Requested-With': 'XMLHttpRequest',
-                    'Accept': 'application/json'
-                }
-            })
-            .then(response => response.json())
-            .then(data => {
-                searchResults.innerHTML = '';
-
-                if (data.length === 0) {
-                    searchResults.innerHTML = '<div class="p-3 text-sm text-gray-500">Aucun résultat trouvé</div>';
-                } else {
-                    data.forEach(distributeur => {
-                        const div = document.createElement('div');
-                        div.className = 'p-3 hover:bg-gray-50 cursor-pointer transition-colors duration-150';
-                        div.innerHTML = `
-                            <div class="font-medium text-sm text-gray-900">#${distributeur.distributeur_id} - ${distributeur.pnom_distributeur} ${distributeur.nom_distributeur}</div>
-                            ${distributeur.tel_distributeur ? `<div class="text-xs text-gray-500">${distributeur.tel_distributeur}</div>` : ''}
-                        `;
-                        div.addEventListener('click', () => selectDistributeur(distributeur));
-                        searchResults.appendChild(div);
-                    });
-                }
-
-                searchResults.classList.remove('hidden');
-            })
-            .catch(error => {
-                console.error('Erreur lors de la recherche:', error);
-                searchResults.innerHTML = '<div class="p-3 text-sm text-red-500">Erreur lors de la recherche</div>';
-                searchResults.classList.remove('hidden');
-            });
-        }, 300);
-    });
-
-    function selectDistributeur(distributeur) {
-        distributeurIdInput.value = distributeur.id;
-        searchInput.value = `${distributeur.distributeur_id} - ${distributeur.pnom_distributeur} ${distributeur.nom_distributeur}`;
-        searchResults.classList.add('hidden');
-    }
-
-    // Fermer les résultats quand on clique ailleurs
-    document.addEventListener('click', function(e) {
-        if (!searchInput.contains(e.target) && !searchResults.contains(e.target)) {
-            searchResults.classList.add('hidden');
-        }
-    });
-
-    // Calcul automatique
-    const productSelect = document.getElementById('products_id');
+    // Calcul automatique lors du changement de quantité
     const quantityInput = document.getElementById('qt');
-    const previewPrice = document.getElementById('preview_price');
-    const previewTotal = document.getElementById('preview_total');
     const previewPoints = document.getElementById('preview_points');
+    const previewTotal = document.getElementById('preview_total');
+
+    const prixUnitaire = {{ $achat->prix_unitaire_achat }};
+    const pointsUnitaire = {{ $achat->points_unitaire_achat }};
 
     function updateCalculation() {
-        const selectedOption = productSelect.options[productSelect.selectedIndex];
         const quantity = parseInt(quantityInput.value) || 0;
+        const total = prixUnitaire * quantity;
+        const totalPoints = pointsUnitaire * quantity;
 
-        if (selectedOption && selectedOption.value) {
-            const price = parseFloat(selectedOption.dataset.price) || 0;
-            const points = parseInt(selectedOption.dataset.points) || 0;
-            const total = price * quantity;
-            const totalPoints = points * quantity;
-
-            previewPrice.textContent = new Intl.NumberFormat('fr-FR').format(price) + ' XAF';
-            previewTotal.textContent = new Intl.NumberFormat('fr-FR').format(total) + ' XAF';
-            previewPoints.textContent = totalPoints + ' PV';
-        }
+        previewTotal.textContent = new Intl.NumberFormat('fr-FR').format(total) + ' FCFA';
+        previewPoints.textContent = totalPoints.toFixed(2) + ' PV';
     }
 
-    productSelect.addEventListener('change', updateCalculation);
     quantityInput.addEventListener('input', updateCalculation);
+
+    // Calcul initial
+    updateCalculation();
 </script>
 @endpush
 @endsection
