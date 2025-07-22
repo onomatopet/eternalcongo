@@ -194,12 +194,12 @@ class BonusController extends Controller
             'date_generation' => Carbon::now()->format('d/m/Y'),
             'numero_recu' => $bonus->num,
             'details' => [
-                'bonus_direct' => $bonus->bonus_direct,
-                'bonus_indirect' => $bonus->bonus_indirect,
-                'bonus_leadership' => $bonus->bonus_leadership,
-                'total_brut' => $bonus->bonus,
-                'epargne' => $bonus->epargne,
-                'net_payer' => $bonus->bonusFinal
+                'bonus_direct' => $bonus->bonus_direct ?? 0,
+                'bonus_indirect' => $bonus->bonus_indirect ?? 0,
+                'bonus_leadership' => $bonus->bonus_leadership ?? 0,
+                'total_brut' => $bonus->bonus ?? 0,
+                'epargne' => $bonus->epargne ?? 0,
+                'net_payer' => $bonus->bonusFinal ?? 0
             ]
         ];
 
@@ -216,63 +216,83 @@ class BonusController extends Controller
         return $pdf->download($filename);
     }
 
+    // Si les méthodes de calcul n'existent pas, ajoutez-les aussi :
+
     /**
-     * Méthodes de calcul des bonus
+     * Calculate direct bonus from personal purchases.
      */
-    private function calculateBonusDirect($distributeurId, $period)
+    private function calculateBonusDirect($distributeurId, $period): float
     {
-        // Calculer le bonus direct basé sur les achats personnels
-        $achatsPersonnels = Achat::where('distributeur_id', $distributeurId)
-                                ->where('period', $period)
-                                ->sum('pointvaleur');
-        
-        // Taux de bonus direct (exemple : 20%)
-        $tauxBonusDirect = 0.20;
-        
-        return $achatsPersonnels * $tauxBonusDirect;
+        $achats = Achat::where('distributeur_id', $distributeurId)
+                    ->where('period', $period)
+                    ->get();
+
+        $totalPoints = 0;
+        foreach ($achats as $achat) {
+            $points = ($achat->points_unitaire_achat ?? 0) * ($achat->qt ?? 0);
+            $totalPoints += $points;
+        }
+
+        // Taux de bonus direct selon votre logique métier
+        // Exemple : 20% des points
+        return $totalPoints * 0.20 * 100; // Si 1 point = 100 FCFA
     }
 
-    private function calculateBonusIndirect($distributeurId, $period)
+    /**
+     * Calculate indirect bonus from downline purchases.
+     */
+    private function calculateBonusIndirect($distributeurId, $period): float
     {
-        // Récupérer le distributeur et ses filleuls
-        $distributeur = Distributeur::find($distributeurId);
-        
-        // Calculer le bonus indirect basé sur les achats des filleuls directs
-        $achatsFilleuls = Achat::whereIn('distributeur_id', function($query) use ($distributeurId) {
-                                $query->select('id')
-                                    ->from('distributeurs')
-                                    ->where('id_distrib_parent', $distributeurId);
-                            })
-                            ->where('period', $period)
-                            ->sum('pointvaleur');
-        
-        // Taux de bonus indirect selon le grade
-        $tauxBonusIndirect = $this->getTauxBonusIndirect($distributeur->etoiles_id);
-        
-        return $achatsFilleuls * $tauxBonusIndirect;
-    }
+        // Récupérer tous les filleuls directs
+        $filleuls = Distributeur::where('id_distrib_parent', $distributeurId)->pluck('id');
 
-    private function calculateBonusLeadership($distributeurId, $period)
-    {
-        $distributeur = Distributeur::find($distributeurId);
-        
-        // Le bonus leadership s'applique uniquement aux grades élevés (4+)
-        if ($distributeur->etoiles_id < 4) {
+        if ($filleuls->isEmpty()) {
             return 0;
         }
+
+        $achatsFilleuls = Achat::whereIn('distributeur_id', $filleuls)
+                            ->where('period', $period)
+                            ->get();
+
+        $totalPoints = 0;
+        foreach ($achatsFilleuls as $achat) {
+            $points = ($achat->points_unitaire_achat ?? 0) * ($achat->qt ?? 0);
+            $totalPoints += $points;
+        }
+
+        // Taux de bonus indirect selon le grade
+        $distributeur = Distributeur::find($distributeurId);
+        $taux = $this->getTauxBonusIndirect($distributeur->etoiles_id ?? 1);
         
-        // Calculer le volume total de la descendance
-        $volumeDescendance = $this->calculateVolumeDescendance($distributeurId, $period);
-        
-        // Taux de bonus leadership selon le grade
-        $tauxLeadership = $this->getTauxBonusLeadership($distributeur->etoiles_id);
-        
-        return $volumeDescendance * $tauxLeadership;
+        return $totalPoints * $taux * 100; // Si 1 point = 100 FCFA
     }
 
-    private function getTauxBonusIndirect($grade)
+    /**
+     * Calculate leadership bonus based on rank and performance.
+     */
+    private function calculateBonusLeadership($distributeurId, $period): float
     {
-        // Taux de bonus indirect selon le grade
+        $distributeur = Distributeur::find($distributeurId);
+
+        // Bonus leadership uniquement pour les grades élevés (ex: 4 étoiles et plus)
+        if (($distributeur->etoiles_id ?? 0) < 4) {
+            return 0;
+        }
+
+        // Calculer le volume de toute la descendance
+        $volumeTotal = $this->calculateVolumeDescendance($distributeurId, $period);
+        
+        // Taux de leadership selon le grade
+        $taux = $this->getTauxBonusLeadership($distributeur->etoiles_id);
+        
+        return $volumeTotal * $taux * 100; // Si 1 point = 100 FCFA
+    }
+
+    /**
+     * Get indirect bonus rate based on grade
+     */
+    private function getTauxBonusIndirect($grade): float
+    {
         $taux = [
             1 => 0.05,
             2 => 0.10,
@@ -284,9 +304,11 @@ class BonusController extends Controller
         return $taux[$grade] ?? 0.05;
     }
 
-    private function getTauxBonusLeadership($grade)
+    /**
+     * Get leadership bonus rate based on grade
+     */
+    private function getTauxBonusLeadership($grade): float
     {
-        // Taux de bonus leadership selon le grade
         $taux = [
             4 => 0.02,
             5 => 0.03,
@@ -300,7 +322,10 @@ class BonusController extends Controller
         return $taux[$grade] ?? 0;
     }
 
-    private function calculateVolumeDescendance($distributeurId, $period, $niveau = 0, $maxNiveau = 5)
+    /**
+     * Calculate total volume of downline
+     */
+    private function calculateVolumeDescendance($distributeurId, $period, $niveau = 0, $maxNiveau = 5): float
     {
         if ($niveau >= $maxNiveau) {
             return 0;
@@ -313,7 +338,7 @@ class BonusController extends Controller
                                     ->where('id_distrib_parent', $distributeurId);
                             })
                             ->where('period', $period)
-                            ->sum('pointvaleur');
+                            ->sum(DB::raw('(points_unitaire_achat * qt)'));
         
         // Volume des filleuls indirects (récursif)
         $filleuls = Distributeur::where('id_distrib_parent', $distributeurId)->pluck('id');
@@ -323,18 +348,27 @@ class BonusController extends Controller
             $volumeIndirect += $this->calculateVolumeDescendance($filleulId, $period, $niveau + 1, $maxNiveau);
         }
         
-        return $volumeDirect + $volumeIndirect;
+        return ($volumeDirect ?? 0) + $volumeIndirect;
     }
 
-    private function generateBonusNumber($period, $distributeurId)
+    /**
+     * Generate unique bonus number.
+     */
+    private function generateBonusNumber($period, $distributeurId): string
     {
-        // Générer un numéro unique pour le bonus
         // Format: YYYYMM-XXXXX-ID
         $lastBonus = Bonus::where('period', $period)
                         ->orderBy('id', 'desc')
                         ->first();
         
-        $sequence = $lastBonus ? (intval(substr($lastBonus->num, 7, 5)) + 1) : 1;
+        $sequence = 1;
+        if ($lastBonus && $lastBonus->num) {
+            // Extraire le numéro de séquence si le format est correct
+            $parts = explode('-', $lastBonus->num);
+            if (count($parts) >= 2) {
+                $sequence = intval($parts[1]) + 1;
+            }
+        }
         
         return sprintf('%s-%05d-%d', str_replace('-', '', $period), $sequence, $distributeurId);
     }
