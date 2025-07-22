@@ -37,8 +37,11 @@ class BonusController extends Controller
 
         // Obtenir les périodes distinctes pour le filtre
         $periods = Bonus::distinct()->pluck('period')->sort()->reverse();
+        
+        // Obtenir les périodes disponibles pour le calcul
+        $availablePeriods = $this->getAvailablePeriods();
 
-        return view('admin.bonuses.index', compact('bonuses', 'periods'));
+        return view('admin.bonuses.index', compact('bonuses', 'periods', 'availablePeriods'));
     }
 
     /**
@@ -186,17 +189,29 @@ class BonusController extends Controller
             ]
         ];
 
-        // Générer le PDF
-        $pdf = PDF::loadView('admin.bonuses.pdf', $data);
-        
-        // Définir les options du PDF
-        $pdf->setPaper('A4', 'portrait');
-        
-        // Nom du fichier
+        // Définir le nom du fichier
         $filename = 'bonus_' . $bonus->distributeur->distributeur_id . '_' . $bonus->period . '.pdf';
-        
-        // Retourner le PDF pour téléchargement
-        return $pdf->download($filename);
+
+        try {
+            // Générer le PDF
+            $pdf = PDF::loadView('admin.bonuses.pdf', $data);
+            
+            // Définir les options du PDF
+            $pdf->setPaper('A4', 'portrait');
+            
+            // Retourner le PDF pour téléchargement
+            return $pdf->download($filename);
+        } catch (\Exception $e) {
+            // En cas d'erreur, afficher le HTML directement
+            Log::error('Erreur génération PDF: ' . $e->getMessage());
+            
+            // Alternative : retourner la vue HTML avec entêtes pour téléchargement
+            $html = view('admin.bonuses.pdf', $data)->render();
+            
+            return response($html)
+                ->header('Content-Type', 'text/html; charset=UTF-8')
+                ->header('Content-Disposition', 'attachment; filename="' . str_replace('.pdf', '.html', $filename) . '"');
+        }
     }
 
     /**
