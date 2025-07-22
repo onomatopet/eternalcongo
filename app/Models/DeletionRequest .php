@@ -85,13 +85,13 @@ class DeletionRequest extends Model
     {
         switch ($this->entity_type) {
             case self::ENTITY_DISTRIBUTEUR:
-                return $this->belongsTo(Distributeur::class, 'entity_id')->first();
+                return Distributeur::find($this->entity_id);
             case self::ENTITY_ACHAT:
-                return $this->belongsTo(Achat::class, 'entity_id')->first();
+                return Achat::find($this->entity_id);
             case self::ENTITY_PRODUCT:
-                return $this->belongsTo(Product::class, 'entity_id')->first();
+                return Product::find($this->entity_id);
             case self::ENTITY_BONUS:
-                return $this->belongsTo(Bonus::class, 'entity_id')->first();
+                return Bonus::find($this->entity_id);
             default:
                 return null;
         }
@@ -145,7 +145,7 @@ class DeletionRequest extends Model
 
     public function canBeApproved(): bool
     {
-        return $this->isPending() && $this->entity !== null;
+        return $this->isPending() && $this->entity() !== null;
     }
 
     public function canBeRejected(): bool
@@ -155,13 +155,13 @@ class DeletionRequest extends Model
 
     public function canBeExecuted(): bool
     {
-        return $this->isApproved() && $this->entity !== null;
+        return $this->isApproved() && $this->entity() !== null;
     }
 
     /**
      * Actions sur les demandes
      */
-    public function approve(int $approverId, string $note = null): bool
+    public function approve(int $approverId, ?string $note = null): bool
     {
         if (!$this->canBeApproved()) {
             return false;
@@ -250,76 +250,73 @@ class DeletionRequest extends Model
 
         switch ($this->entity_type) {
             case self::ENTITY_DISTRIBUTEUR:
-                return $entity->full_name ?? "Distributeur #{$entity->distributeur_id}";
+                return $entity->full_name ?? $entity->name ?? "Distributeur #{$this->entity_id}";
             case self::ENTITY_ACHAT:
-                return "Achat #{$entity->id}";
+                return "Achat #{$this->entity_id}";
             case self::ENTITY_PRODUCT:
-                return $entity->nom_produit ?? "Produit #{$entity->id}";
+                return $entity->name ?? "Produit #{$this->entity_id}";
+            case self::ENTITY_BONUS:
+                return "Bonus période " . ($entity->period ?? '');
             default:
-                return "Entité #{$this->entity_id}";
+                return "Entité inconnue";
         }
     }
 
     public function getStatusLabel(): string
     {
-        $labels = [
+        return match($this->status) {
             self::STATUS_PENDING => 'En attente',
             self::STATUS_APPROVED => 'Approuvée',
             self::STATUS_REJECTED => 'Rejetée',
             self::STATUS_COMPLETED => 'Exécutée',
-            self::STATUS_CANCELLED => 'Annulée'
-        ];
-
-        return $labels[$this->status] ?? $this->status;
+            self::STATUS_CANCELLED => 'Annulée',
+            default => 'Inconnu'
+        };
     }
 
     public function getStatusColor(): string
     {
-        $colors = [
+        return match($this->status) {
             self::STATUS_PENDING => 'yellow',
-            self::STATUS_APPROVED => 'green',
+            self::STATUS_APPROVED => 'blue',
             self::STATUS_REJECTED => 'red',
-            self::STATUS_COMPLETED => 'blue',
-            self::STATUS_CANCELLED => 'gray'
-        ];
-
-        return $colors[$this->status] ?? 'gray';
-    }
-
-    public function hasBackup(): bool
-    {
-        return !empty($this->backup_info['backup_id']);
-    }
-
-    public function getBackupSize(): string
-    {
-        return $this->backup_info['size'] ?? 'Inconnu';
+            self::STATUS_COMPLETED => 'green',
+            self::STATUS_CANCELLED => 'gray',
+            default => 'gray'
+        };
     }
 
     /**
-     * Méthodes statiques pour création
+     * Détermine l'impact de la suppression
      */
-    public static function createForDistributeur(Distributeur $distributeur, string $reason, array $validationData = []): self
+    public function getImpactLevel(): string
     {
-        return self::create([
-            'entity_type' => self::ENTITY_DISTRIBUTEUR,
-            'entity_id' => $distributeur->id,
-            'requested_by_id' => auth()->id(),
-            'status' => self::STATUS_PENDING,
-            'reason' => $reason,
-            'validation_data' => $validationData
-        ]);
+        $validationData = $this->validation_data ?? [];
+        $relatedCount = 0;
+
+        if (isset($validationData['related_data'])) {
+            foreach ($validationData['related_data'] as $data) {
+                $relatedCount += is_array($data) ? count($data) : 0;
+            }
+        }
+
+        if ($relatedCount > 100) {
+            return 'critical';
+        } elseif ($relatedCount > 50) {
+            return 'high';
+        } elseif ($relatedCount > 10) {
+            return 'medium';
+        } else {
+            return 'low';
+        }
     }
 
-    public static function createForAchat(Achat $achat, string $reason, array $validationData = []): self
+    /**
+     * Vérifier si la demande est expirée
+     */
+    public function isExpired(): bool
     {
-        return self::create([
-            'entity_type' => self::ENTITY_ACHAT,
-            'entity_id' => $achat->id,
-            'requested_by_id' => auth()->id(),
-            'status' => self::STATUS_PENDING,
-            'reason' => $reason,
-            'validation_data' => $validationData
-        ]);
+        // Les demandes sont considérées expirées après 30 jours si toujours en attente
+        return $this->isPending() && $this->created_at->addDays(30)->isPast();
     }
 }

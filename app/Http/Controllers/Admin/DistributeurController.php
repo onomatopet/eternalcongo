@@ -34,7 +34,7 @@ class DistributeurController extends Controller
     {
         // Récupérer le terme de recherche
         $searchTerm = $request->input('search');
-        
+
         // Construire la requête de base
         $distributeurs = Distributeur::with(['parent', 'children'])
             ->orderBy('created_at', 'desc');
