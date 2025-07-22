@@ -12,6 +12,8 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
+use App\Models\DeletionRequest;
+use Illuminate\Support\Facades\Auth;
 
 class AchatController extends Controller
 {
@@ -384,5 +386,61 @@ class AchatController extends Controller
             'price' => $product->prix_product,
             'points' => optional($product->pointValeur)->numbers ?? 0,
         ]);
+    }
+
+    /**
+     * Exécute une suppression approuvée (appelée par DeletionRequestController)
+     */
+    public function executeDeletion(DeletionRequest $deletionRequest): RedirectResponse
+    {
+        if (!$deletionRequest->canBeExecuted()) {
+            return back()->with('error', 'Cette demande ne peut pas être exécutée.');
+        }
+
+        $achat = $deletionRequest->entity();
+        if (!$achat || !($achat instanceof Achat)) {
+            return back()->with('error', 'L\'achat à supprimer n\'existe plus.');
+        }
+
+        DB::beginTransaction();
+        try {
+            // Créer un backup
+            $backupData = [
+                'achat' => $achat->toArray(),
+                'distributeur_id' => $achat->distributeur_id,
+                'produit_id' => $achat->produit_id,
+                'quantite' => $achat->quantite,
+                'montant_total' => $achat->montant_total_ligne,
+                'periode' => $achat->periode,
+                'deleted_at' => now()->toISOString(),
+                'deleted_by' => Auth::id()
+            ];
+
+            // Supprimer l'achat
+            $achat->delete();
+
+            // Marquer la demande comme complétée
+            $deletionRequest->markAsCompleted([
+                'backup_data' => $backupData,
+                'executed_by' => Auth::id()
+            ]);
+
+            DB::commit();
+
+            return redirect()
+                ->route('admin.deletion-requests.index')
+                ->with('success', 'Achat supprimé avec succès.');
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error("Erreur exécution suppression achat", [
+                'deletion_request_id' => $deletionRequest->id,
+                'achat_id' => $achat->id,
+                'error' => $e->getMessage(),
+                'user_id' => Auth::id()
+            ]);
+
+            return back()->with('error', 'Erreur lors de l\'exécution: ' . $e->getMessage());
+        }
     }
 }

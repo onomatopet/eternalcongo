@@ -9,6 +9,7 @@ use Illuminate\Http\Request;
 use Illuminate\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Auth;
+use App\Http\Controllers\Admin\DistributeurController;
 
 class DeletionRequestController extends Controller
 {
@@ -148,13 +149,52 @@ class DeletionRequestController extends Controller
         // Déléguer l'exécution au contrôleur approprié selon le type d'entité
         switch ($deletionRequest->entity_type) {
             case DeletionRequest::ENTITY_DISTRIBUTEUR:
-                return app(DistributeurController::class)->executeDeletion($deletionRequest);
+                /** @var DistributeurController $controller */
+                $controller = app(DistributeurController::class);
+                return $controller->executeDeletion($deletionRequest);
 
             case DeletionRequest::ENTITY_ACHAT:
-                return app(AchatController::class)->executeDeletion($deletionRequest);
+                // Pour l'instant, gérer directement ici car AchatController n'a pas executeDeletion
+                return $this->executeAchatDeletion($deletionRequest);
 
             default:
                 return back()->with('error', 'Type d\'entité non supporté pour l\'exécution.');
+        }
+    }
+
+    /**
+     * Exécute la suppression d'un achat
+     */
+    private function executeAchatDeletion(DeletionRequest $deletionRequest): RedirectResponse
+    {
+        $achat = $deletionRequest->entity();
+        if (!$achat) {
+            return back()->with('error', 'L\'achat à supprimer n\'existe plus.');
+        }
+
+        try {
+            // Créer un backup
+            $backupData = [
+                'achat' => $achat->toArray(),
+                'deleted_at' => now()->toISOString(),
+                'deleted_by' => Auth::id()
+            ];
+
+            // Supprimer l'achat
+            $achat->delete();
+
+            // Marquer la demande comme complétée
+            $deletionRequest->markAsCompleted([
+                'backup_data' => $backupData,
+                'executed_by' => Auth::id()
+            ]);
+
+            return redirect()
+                ->route('admin.deletion-requests.index')
+                ->with('success', 'Achat supprimé avec succès.');
+
+        } catch (\Exception $e) {
+            return back()->with('error', 'Erreur lors de la suppression: ' . $e->getMessage());
         }
     }
 
