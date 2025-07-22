@@ -1,272 +1,303 @@
-{{-- resources/views/admin/bonuses/pdf.blade.php --}}
-<!DOCTYPE html>
-<html lang="fr">
+<!doctype html>
+<html class="no-js" lang="">
 <head>
-    <meta charset="UTF-8">
-    <title>Reçu de Bonus - {{ $numero_recu }}</title>
+    <meta charset="utf-8">
+    <title>BONUS - {{ $distributeur->distributeur_id }} {{ strtoupper($distributeur->full_name) }}</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    
     <style>
-        @page {
-            margin: 100px 50px;
+        /* Styles de base */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
         }
+        
         body {
-            font-family: DejaVu Sans, sans-serif;
-            font-size: 12px;
+            font-family: Arial, sans-serif;
+            font-size: 14px;
+            line-height: 1.5;
             color: #333;
+            background-color: #fff;
         }
-        .header {
-            position: fixed;
-            top: -60px;
-            left: 0;
-            right: 0;
-            height: 50px;
-            text-align: center;
-            line-height: 35px;
+        
+        /* Container principal */
+        .web-container {
+            width: 100%;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
         }
-        .footer {
-            position: fixed;
-            bottom: -60px;
-            left: 0;
-            right: 0;
-            height: 50px;
-            text-align: center;
-            line-height: 35px;
-            font-size: 10px;
-            color: #666;
+        
+        /* Logo container */
+        .logo-container {
+            background-color: #ffffff;
+            padding: 24px;
+            margin-bottom: 2px;
+            border-radius: 12px 12px 0 0;
         }
-        .logo {
-            text-align: center;
-            margin-bottom: 20px;
-        }
-        .company-info {
-            text-align: center;
-            margin-bottom: 30px;
-        }
-        .company-name {
-            font-size: 24px;
-            font-weight: bold;
-            color: #2c5282;
-            margin-bottom: 5px;
-        }
-        .document-title {
-            font-size: 20px;
-            font-weight: bold;
-            text-align: center;
-            margin: 30px 0;
-            text-decoration: underline;
-        }
-        .info-section {
-            margin-bottom: 20px;
-            padding: 15px;
-            background-color: #f7fafc;
-            border: 1px solid #e2e8f0;
-            border-radius: 5px;
-        }
-        .info-row {
-            margin-bottom: 8px;
-            display: table;
+        
+        .logo-wrapper {
+            display: block;
             width: 100%;
         }
-        .info-label {
-            display: table-cell;
-            width: 40%;
-            font-weight: bold;
-            color: #4a5568;
+        
+        .logo-wrapper img {
+            height: 38px;
         }
-        .info-value {
-            display: table-cell;
-            width: 60%;
-            color: #2d3748;
+        
+        /* Invoice info container */
+        .invoice-info-container {
+            background-color: #ffffff;
+            padding: 24px;
+            margin-bottom: 2px;
+            font-size: 12px;
         }
-        .table {
+        
+        .invoice-info-container table {
             width: 100%;
             border-collapse: collapse;
-            margin: 20px 0;
         }
-        .table th {
-            background-color: #2c5282;
-            color: white;
-            padding: 12px;
-            text-align: left;
-            font-weight: bold;
+        
+        .invoice-info-container td {
+            padding: 4px 0;
+            vertical-align: top;
         }
-        .table td {
-            padding: 10px;
-            border-bottom: 1px solid #e2e8f0;
+        
+        .client-name {
+            font-size: 22px;
+            font-weight: 700;
         }
-        .table tr:nth-child(even) {
-            background-color: #f7fafc;
+        
+        .large {
+            font-size: 16px;
         }
-        .amount {
-            text-align: right;
-            font-weight: bold;
+        
+        .total {
+            color: #5bb4ff;
+            font-weight: 700;
         }
-        .total-row {
-            background-color: #e6fffa !important;
-            font-weight: bold;
+        
+        /* Line items container */
+        .line-items-container {
+            background-color: #ffffff;
+            padding: 24px;
+            margin-bottom: 2px;
         }
-        .total-final {
-            background-color: #2c5282 !important;
-            color: white;
-            font-size: 14px;
-        }
-        .signature-section {
-            margin-top: 50px;
-            display: table;
+        
+        .line-items-container table {
             width: 100%;
+            border-collapse: collapse;
         }
-        .signature-box {
-            display: table-cell;
-            width: 45%;
+        
+        .line-items-container thead th {
+            color: #595959;
+            font-size: 12px;
+            text-transform: uppercase;
+            font-weight: 500;
+            letter-spacing: 0.1em;
+            padding: 12px 0;
+            border-bottom: 2px solid #eae8e4;
+            text-align: left;
+        }
+        
+        .line-items-container tbody td {
+            padding: 24px 0 12px 0;
+            font-weight: 400;
+        }
+        
+        .line-items-container tbody tr:last-child td {
+            padding-bottom: 24px;
+            border-bottom: 2px solid #eae8e4;
+        }
+        
+        .line-items-container .right {
+            text-align: right;
+        }
+        
+        .line-items-container .bold {
+            font-weight: 600;
+        }
+        
+        .heading-quantity {
+            width: 48px;
+        }
+        
+        .heading-price {
+            text-align: right;
+            width: 96px;
+        }
+        
+        .has-bottom-border {
+            padding-top: 0;
+            border-radius: 0;
+        }
+        
+        .has-bottom-border table tbody {
+            border-bottom: none;
+        }
+        
+        .has-bottom-border table tbody td {
+            border-bottom: none;
+        }
+        
+        /* Footer */
+        .footer {
+            margin-top: 32px;
             text-align: center;
+            font-size: 12px;
+            color: #595959;
         }
-        .signature-line {
-            margin-top: 60px;
-            border-top: 1px solid #333;
-            padding-top: 5px;
+        
+        .footer-info {
+            margin-bottom: 8px;
         }
-        .note {
-            margin-top: 30px;
-            padding: 15px;
-            background-color: #fef5e7;
-            border: 1px solid #f9e79f;
-            border-radius: 5px;
-            font-size: 11px;
+        
+        .footer-thanks {
+            font-weight: 600;
         }
-        .watermark {
-            position: fixed;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%) rotate(-45deg);
-            font-size: 100px;
-            color: rgba(0, 0, 0, 0.05);
-            z-index: -1;
+        
+        .footer-thanks img {
+            display: inline-block;
+            position: relative;
+            top: 1px;
+            width: 16px;
+            margin-right: 4px;
+        }
+        
+        /* Impression */
+        @media print {
+            .boutonPrint {
+                display: none !important;
+            }
+            .web-container {
+                padding: 0;
+            }
+        }
+        
+        @page {
+            margin: 20mm;
+            size: A4;
         }
     </style>
 </head>
 <body>
-    <div class="watermark">ORIGINAL</div>
-    
-    <div class="header">
-        <p>{{ config('app.name', 'ETERNEL') }} - Système de Gestion MLM</p>
-    </div>
-
-    <div class="footer">
-        <p>Document généré le {{ $date_generation }} | Page <span class="pagenum"></span></p>
-    </div>
-
-    <div class="company-info">
-        <div class="company-name">{{ config('app.name', 'ETERNEL') }}</div>
-        <p>Réseau de Marketing Multi-Niveaux<br>
-        Tél: +242 00 000 00 00 | Email: contact@eternel.com</p>
-    </div>
-
-    <h1 class="document-title">REÇU DE BONUS</h1>
-
-    <div class="info-section">
-        <div class="info-row">
-            <div class="info-label">Numéro de reçu :</div>
-            <div class="info-value">{{ $numero_recu }}</div>
-        </div>
-        <div class="info-row">
-            <div class="info-label">Période :</div>
-            <div class="info-value">{{ $periode }}</div>
-        </div>
-        <div class="info-row">
-            <div class="info-label">Date d'émission :</div>
-            <div class="info-value">{{ $date_generation }}</div>
-        </div>
-    </div>
-
-    <div class="info-section">
-        <h3 style="margin-top: 0; color: #2c5282;">BÉNÉFICIAIRE</h3>
-        <div class="info-row">
-            <div class="info-label">Matricule :</div>
-            <div class="info-value">#{{ $distributeur->distributeur_id }}</div>
-        </div>
-        <div class="info-row">
-            <div class="info-label">Nom complet :</div>
-            <div class="info-value">{{ $distributeur->pnom_distributeur }} {{ $distributeur->nom_distributeur }}</div>
-        </div>
-        <div class="info-row">
-            <div class="info-label">Grade actuel :</div>
-            <div class="info-value">Grade {{ $distributeur->etoiles_id }}</div>
-        </div>
-        @if($distributeur->tel_distributeur)
-        <div class="info-row">
-            <div class="info-label">Téléphone :</div>
-            <div class="info-value">{{ $distributeur->tel_distributeur }}</div>
-        </div>
-        @endif
-        @if($distributeur->adress_distributeur)
-        <div class="info-row">
-            <div class="info-label">Adresse :</div>
-            <div class="info-value">{{ $distributeur->adress_distributeur }}</div>
-        </div>
-        @endif
-    </div>
-
-    <table class="table">
-        <thead>
-            <tr>
-                <th style="width: 60%;">Description</th>
-                <th style="width: 40%; text-align: right;">Montant (FCFA)</th>
-            </tr>
-        </thead>
-        <tbody>
-            <tr>
-                <td>Bonus Direct (Achats personnels)</td>
-                <td class="amount">{{ number_format($details['bonus_direct'], 0, ',', ' ') }}</td>
-            </tr>
-            <tr>
-                <td>Bonus Indirect (Achats des filleuls)</td>
-                <td class="amount">{{ number_format($details['bonus_indirect'], 0, ',', ' ') }}</td>
-            </tr>
-            @if($details['bonus_leadership'] > 0)
-            <tr>
-                <td>Bonus Leadership</td>
-                <td class="amount">{{ number_format($details['bonus_leadership'], 0, ',', ' ') }}</td>
-            </tr>
-            @endif
-            <tr class="total-row">
-                <td><strong>TOTAL BRUT</strong></td>
-                <td class="amount">{{ number_format($details['total_brut'], 0, ',', ' ') }}</td>
-            </tr>
-            <tr>
-                <td>Épargne (10%)</td>
-                <td class="amount" style="color: #e53e3e;">- {{ number_format($details['epargne'], 0, ',', ' ') }}</td>
-            </tr>
-            <tr class="total-final">
-                <td><strong>NET À PAYER</strong></td>
-                <td class="amount" style="font-size: 16px;">{{ number_format($details['net_payer'], 0, ',', ' ') }} FCFA</td>
-            </tr>
-        </tbody>
-    </table>
-
-    <div class="note">
-        <strong>Note importante :</strong> Ce reçu constitue un justificatif officiel de vos commissions pour la période indiquée. 
-        L'épargne de 10% est automatiquement mise de côté pour votre compte épargne. 
-        Le montant net sera versé selon les modalités convenues avec l'administration.
-    </div>
-
-    <div class="signature-section">
-        <div class="signature-box">
-            <p><strong>Le Bénéficiaire</strong></p>
-            <div class="signature-line">
-                {{ $distributeur->pnom_distributeur }} {{ $distributeur->nom_distributeur }}
+    <div class="web-container">
+        <div class="logo-container">
+            <div class="logo-wrapper">
+                <img src="{{ public_path('assets/invoice/img/logo.jpg') }}" alt="Logo">
             </div>
         </div>
-        <div style="display: table-cell; width: 10%;"></div>
-        <div class="signature-box">
-            <p><strong>Pour l'Administration</strong></p>
-            <div class="signature-line">
-                Signature et Cachet
+        
+        <div class="invoice-info-container">
+            <table>
+                <tr>
+                    <td colspan="2" class="large total">
+                        <strong>COPIE CONFORME</strong>
+                    </td>
+                </tr>
+                <tr>
+                    <td rowspan="2" class="client-name" style="width: 60%;">
+                        Bulletin Bonus<br/>
+                        {{ strtoupper($distributeur->full_name) }}<br/>
+                        ID : {{ $distributeur->distributeur_id }}
+                    </td>
+                    <td style="width: 40%;">
+                        ETERNAL CONGO SARL
+                    </td>
+                </tr>
+                <tr>
+                    <td>
+                        45, rue BAYAS POTO-POTO
+                    </td>
+                </tr>
+                <tr>
+                    <td>
+                        Date: {{ $date_generation }} {{ now()->format('H:i:s') }}
+                    </td>
+                    <td>
+                        Tel : 04 403 16 16
+                    </td>
+                </tr>
+                <tr>
+                    <td>
+                        No: <strong>{{ $numero_recu }}</strong>
+                    </td>
+                    <td>
+                        contact@eternalcongo.com
+                    </td>
+                </tr>
+            </table>
+        </div>
+        
+        <div class="line-items-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th class="heading-quantity">#</th>
+                        <th>Période</th>
+                        <th class="heading-price">Bonus Direct</th>
+                        <th class="heading-price">Bonus Indirect</th>
+                        <th class="heading-price">Total $</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>1</td>
+                        <td>{{ $periode }}</td>
+                        <td class="right">$ {{ number_format($details['bonus_direct'] / 550, 2, '.', '') }}</td>
+                        <td class="right">$ {{ number_format(($details['bonus_indirect'] + $details['bonus_leadership']) / 550, 2, '.', '') }}</td>
+                        <td class="bold right">$ {{ number_format(($details['total_brut'] - $details['epargne']) / 550, 2, '.', '') }}</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        
+        <div class="line-items-container has-bottom-border">
+            <table>
+                <thead>
+                    <tr>
+                        <th style="text-align: left;">Montant en XAF</th>
+                        <th style="width: 20px;"></th>
+                        <th style="text-align: right;">TOTAL A PAYER</th>
+                        <th style="text-align: right;">Montant en Dollars</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td class="large total">{{ number_format($details['net_payer'], 0, ',', ' ') }} xaf</td>
+                        <td></td>
+                        <td></td>
+                        <td class="large total right">${{ number_format($details['net_payer'] / 550, 2, '.', '') }}</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        
+        <div class="line-items-container has-bottom-border" style="border-radius: 0 0 12px 12px;">
+            <table>
+                <thead>
+                    <tr>
+                        <th style="text-align: left;">VISA DU CAISSIER</th>
+                        <th style="width: 20px;"></th>
+                        <th></th>
+                        <th style="text-align: right;">VISA DE L'AYANT DROIT</th>
+                    </tr>
+                </thead>
+            </table>
+        </div>
+        
+        <div class="footer">
+            <div class="footer-info">
+                <span>contact@eternalcongo.com</span> |
+                <span>Tel : 04 403 16 16</span> |
+                <span>eternalcongo.com</span>
+            </div>
+            <div class="footer-thanks">
+                <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAABHNCSVQICAgIfAhkiAAAAAlwSFlzAAAA7AAAAOwBeShxvQAAABl0RVh0U29mdHdhcmUAd3d3Lmlua3NjYXBlLm9yZ5vuPBoAAAKsSURBVDiNpZPPaxNBFMc/s7ubTbLZJNukTX9YqS1UqLQgVLyIB0+CJ0H/Ai+ePHgS9OLRk+DBm3jw4kEQPOhJEDx48GAVqlhQW9Omv9L8aLqb3czuzHgIaWqCFnzwYN7Me9/PvPdmHlJKATB58eqINV49Lek+KaVAJMmnhqnV95ubQw+vzwJsCwRgMrywJJMrQjhBSAkgEEIglEQoKRO5n2tLzHxwdgJ2ATLOAgjHdnNttbmlprq1RigJiFpA1+HlQsCAyQCcpZWQ3d8nhW1LSdcKx5bCtqRk5qWwrdz3+ZUl0zQcGAOwMg6D4yZayk9m0oDCsqBjG5g2F4MdAKbF6fqQNGQmp2AqnwDNh2WDYXNx2rS9AOl5HDo7JDu3oGDR8O0TlgGlb19RSxYqwHZARIE4MB7gc0u1HnhzE3E1dXBShJNRxpNRJnwxjgOsB1ZQHQAU9AyLnhHRo5dJD6KnMaRnoGe0p6o1x5EAsD2BaFs9kwhGGYtEKUQiDCaiDCeiPBiKksz5oCXQt2yJBEAP6ND2eOsqD5/U6B/pZGy4g7u366iGRv/ePKqhkcp58GxqKzK9a13u6f1viwsU+pKMjxToDGnMLdZY/mbS/yrB/UqQ0LQfT6cPT/M7VEMTzgYA2OPJqEgJYu9WkP2TBfp2+1jfMJn/VGPhc5X3SzXCJT+zy0FCP/y4Oh2nUo/9DQCUkyN9YufQlJQS5r80uPOgzOP5CtFSnJOjIU6MhnizWOP2bIWqaVNqTFdVf/1i+9Pc2I+H2wFhOBQJRkXHjvNXM2F+r1s8eVHhyq0yiiI4dyLMhVNh9nT5sFsOt5oCQ6DHHW9jdPp2I3LlRsXwFH8K6Pd0+klHFJLTEQGEFNV+r6vF3t74hSsK8Afwm/8F/gDbrvuWy6rEnQAAAABJRU5ErkJggg==" alt="heart">
+                <span>Thank you!</span>
             </div>
         </div>
-    </div>
-
-    <div style="margin-top: 40px; text-align: center; font-size: 10px; color: #666;">
-        <p>Ce document a été généré électroniquement et est valide sans signature manuscrite.</p>
-        <p>Pour toute réclamation, veuillez contacter l'administration dans les 30 jours suivant l'émission.</p>
     </div>
 </body>
 </html>

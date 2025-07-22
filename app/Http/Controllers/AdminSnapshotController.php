@@ -50,7 +50,7 @@ class AdminSnapshotController extends Controller
         Log::debug("Affichage du formulaire de création de snapshot.", ['suggested_period' => $suggestedPeriod]);
 
         // Retourne la vue Blade (assurez-vous que le chemin est correct)
-        return view('distributors.create', compact('suggestedPeriod'));
+        return view('admin.snapshots.create', compact('suggestedPeriod'));
     }
 
     /**

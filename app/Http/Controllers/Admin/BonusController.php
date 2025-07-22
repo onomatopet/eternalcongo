@@ -7,12 +7,12 @@ use App\Models\Bonus;
 use App\Models\Distributeur;
 use App\Models\Achat;
 use Illuminate\Http\Request;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\View\View;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Http\RedirectResponse;
-use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
+use Barryvdh\DomPDF\Facade\Pdf;
 
 class BonusController extends Controller
 {
@@ -21,85 +21,68 @@ class BonusController extends Controller
      */
     public function index(Request $request): View
     {
-        // Récupérer les périodes distinctes pour le filtre
-        $availablePeriods = Bonus::select('period')
-                                ->distinct()
-                                ->orderBy('period', 'desc')
-                                ->pluck('period');
+        $query = Bonus::with(['distributeur']);
 
-        // Récupérer les filtres depuis la requête
-        $selectedPeriod = $request->query('period_filter');
-        $searchTerm = $request->query('search');
-
-        // Construire la requête de base avec relations
-        $bonusesQuery = Bonus::with('distributeur')
-                             ->orderBy('period', 'desc')
-                             ->orderBy('created_at', 'desc');
-
-        // Appliquer le filtre par période
-        if ($selectedPeriod && $availablePeriods->contains($selectedPeriod)) {
-            $bonusesQuery->where('period', $selectedPeriod);
+        // Filtrer par période si fournie
+        if ($request->has('period') && $request->period) {
+            $query->where('period', $request->period);
         }
 
-        // Appliquer le filtre de recherche
-        if ($searchTerm) {
-            $bonusesQuery->where(function ($query) use ($searchTerm) {
-                $query->where('num', 'LIKE', "%{$searchTerm}%")
-                      ->orWhereHas('distributeur', function ($subQuery) use ($searchTerm) {
-                          $subQuery->where('nom_distributeur', 'LIKE', "%{$searchTerm}%")
-                                   ->orWhere('pnom_distributeur', 'LIKE', "%{$searchTerm}%")
-                                   ->orWhere('distributeur_id', 'LIKE', "%{$searchTerm}%");
-                      });
-            });
+        // Filtrer par distributeur si fourni
+        if ($request->has('distributeur_id') && $request->distributeur_id) {
+            $query->where('distributeur_id', $request->distributeur_id);
         }
 
-        // Paginer les résultats
-        $bonuses = $bonusesQuery->paginate(20)->withQueryString();
+        $bonuses = $query->orderBy('created_at', 'desc')->paginate(20);
 
-        return view('admin.bonuses.index', [
-            'bonuses' => $bonuses,
-            'availablePeriods' => $availablePeriods,
-            'selectedPeriod' => $selectedPeriod,
-            'searchTerm' => $searchTerm
-        ]);
+        // Obtenir les périodes distinctes pour le filtre
+        $periods = Bonus::distinct()->pluck('period')->sort()->reverse();
+
+        return view('admin.bonuses.index', compact('bonuses', 'periods'));
     }
 
     /**
-     * Show the form for calculating bonuses.
+     * Show the form for creating a new bonus.
      */
     public function create(): View
     {
-        // Obtenir la période actuelle
-        $currentPeriod = date('Y-m');
+        $distributeurs = Distributeur::orderBy('full_name')->get();
+        $currentPeriod = Carbon::now()->format('Y-m');
+        $availablePeriods = $this->getAvailablePeriods();
 
-        // Obtenir les périodes disponibles
-        $availablePeriods = Achat::select('period')
-                                ->distinct()
-                                ->orderBy('period', 'desc')
-                                ->pluck('period');
-
-        // Vérifier s'il y a des achats dans le système
-        $hasAchats = Achat::exists();
-
-        return view('admin.bonuses.create', compact('currentPeriod', 'availablePeriods', 'hasAchats'));
+        return view('admin.bonuses.create', compact('distributeurs', 'currentPeriod', 'availablePeriods'));
     }
 
     /**
-     * Calculate and store bonus for a specific distributor.
+     * Show bonus calculation form for a specific period.
      */
-    public function store(Request $request): RedirectResponse
+    public function showCalculation($period): View
+    {
+        // Récupérer les distributeurs qui ont des achats pour cette période
+        $distributeursAvecAchats = Distributeur::whereHas('achats', function ($query) use ($period) {
+            $query->where('period', $period);
+        })->get();
+
+        // Récupérer les distributeurs qui ont déjà un bonus pour cette période
+        $distributeursAvecBonus = Bonus::where('period', $period)->pluck('distributeur_id')->toArray();
+
+        return view('admin.bonuses.calculate', compact('period', 'distributeursAvecAchats', 'distributeursAvecBonus'));
+    }
+
+    /**
+     * Calculate and store bonus for a distributor.
+     */
+    public function calculate(Request $request, $period): RedirectResponse
     {
         $request->validate([
-            'period' => 'required|regex:/^\d{4}-\d{2}$/',
-            'distributeur_id' => 'required|integer|exists:distributeurs,id',
+            'distributeur_id' => 'required|exists:distributeurs,id',
         ]);
 
-        $period = $request->input('period');
-        $distributeurId = $request->input('distributeur_id');
+        $distributeurId = $request->distributeur_id;
 
-        // Vérifier si le bonus a déjà été calculé pour ce distributeur et cette période
-        if (Bonus::where('period', $period)->where('distributeur_id', $distributeurId)->exists()) {
-            return back()->with('error', 'Un bonus a déjà été calculé pour ce distributeur sur cette période.');
+        // Vérifier si un bonus existe déjà pour ce distributeur et cette période
+        if (Bonus::where('distributeur_id', $distributeurId)->where('period', $period)->exists()) {
+            return back()->with('error', 'Un bonus a déjà été calculé pour ce distributeur pour cette période.');
         }
 
         try {
@@ -191,15 +174,15 @@ class BonusController extends Controller
             'bonus' => $bonus,
             'distributeur' => $bonus->distributeur,
             'periode' => $bonus->period,
-            'date_generation' => Carbon::now()->format('d/m/Y'),
+            'date_generation' => Carbon::now()->format('Y-m-d'),
             'numero_recu' => $bonus->num,
             'details' => [
-                'bonus_direct' => $bonus->bonus_direct ?? 0,
-                'bonus_indirect' => $bonus->bonus_indirect ?? 0,
-                'bonus_leadership' => $bonus->bonus_leadership ?? 0,
-                'total_brut' => $bonus->bonus ?? 0,
-                'epargne' => $bonus->epargne ?? 0,
-                'net_payer' => $bonus->bonusFinal ?? 0
+                'bonus_direct' => $bonus->bonus_direct,
+                'bonus_indirect' => $bonus->bonus_indirect,
+                'bonus_leadership' => $bonus->bonus_leadership,
+                'total_brut' => $bonus->bonus,
+                'epargne' => $bonus->epargne,
+                'net_payer' => $bonus->bonusFinal
             ]
         ];
 
@@ -210,89 +193,69 @@ class BonusController extends Controller
         $pdf->setPaper('A4', 'portrait');
         
         // Nom du fichier
-        $filename = 'recu_bonus_' . $bonus->distributeur->distributeur_id . '_' . $bonus->period . '.pdf';
+        $filename = 'bonus_' . $bonus->distributeur->distributeur_id . '_' . $bonus->period . '.pdf';
         
         // Retourner le PDF pour téléchargement
         return $pdf->download($filename);
     }
 
-    // Si les méthodes de calcul n'existent pas, ajoutez-les aussi :
-
     /**
-     * Calculate direct bonus from personal purchases.
+     * Méthodes de calcul des bonus
      */
-    private function calculateBonusDirect($distributeurId, $period): float
+    private function calculateBonusDirect($distributeurId, $period)
     {
-        $achats = Achat::where('distributeur_id', $distributeurId)
-                    ->where('period', $period)
-                    ->get();
-
-        $totalPoints = 0;
-        foreach ($achats as $achat) {
-            $points = ($achat->points_unitaire_achat ?? 0) * ($achat->qt ?? 0);
-            $totalPoints += $points;
-        }
-
-        // Taux de bonus direct selon votre logique métier
-        // Exemple : 20% des points
-        return $totalPoints * 0.20 * 100; // Si 1 point = 100 FCFA
+        // Calculer le bonus direct basé sur les achats personnels
+        $achatsPersonnels = Achat::where('distributeur_id', $distributeurId)
+                                ->where('period', $period)
+                                ->sum('pointvaleur');
+        
+        // Taux de bonus direct (exemple : 20%)
+        $tauxBonusDirect = 0.20;
+        
+        return $achatsPersonnels * $tauxBonusDirect;
     }
 
-    /**
-     * Calculate indirect bonus from downline purchases.
-     */
-    private function calculateBonusIndirect($distributeurId, $period): float
+    private function calculateBonusIndirect($distributeurId, $period)
     {
-        // Récupérer tous les filleuls directs
-        $filleuls = Distributeur::where('id_distrib_parent', $distributeurId)->pluck('id');
-
-        if ($filleuls->isEmpty()) {
-            return 0;
-        }
-
-        $achatsFilleuls = Achat::whereIn('distributeur_id', $filleuls)
+        // Récupérer le distributeur et ses filleuls
+        $distributeur = Distributeur::find($distributeurId);
+        
+        // Calculer le bonus indirect basé sur les achats des filleuls directs
+        $achatsFilleuls = Achat::whereIn('distributeur_id', function($query) use ($distributeurId) {
+                                $query->select('id')
+                                    ->from('distributeurs')
+                                    ->where('id_distrib_parent', $distributeurId);
+                            })
                             ->where('period', $period)
-                            ->get();
-
-        $totalPoints = 0;
-        foreach ($achatsFilleuls as $achat) {
-            $points = ($achat->points_unitaire_achat ?? 0) * ($achat->qt ?? 0);
-            $totalPoints += $points;
-        }
-
-        // Taux de bonus indirect selon le grade
-        $distributeur = Distributeur::find($distributeurId);
-        $taux = $this->getTauxBonusIndirect($distributeur->etoiles_id ?? 1);
+                            ->sum('pointvaleur');
         
-        return $totalPoints * $taux * 100; // Si 1 point = 100 FCFA
+        // Taux de bonus indirect selon le grade
+        $tauxBonusIndirect = $this->getTauxBonusIndirect($distributeur->etoiles_id);
+        
+        return $achatsFilleuls * $tauxBonusIndirect;
     }
 
-    /**
-     * Calculate leadership bonus based on rank and performance.
-     */
-    private function calculateBonusLeadership($distributeurId, $period): float
+    private function calculateBonusLeadership($distributeurId, $period)
     {
         $distributeur = Distributeur::find($distributeurId);
-
-        // Bonus leadership uniquement pour les grades élevés (ex: 4 étoiles et plus)
-        if (($distributeur->etoiles_id ?? 0) < 4) {
+        
+        // Le bonus leadership s'applique uniquement aux grades élevés (4+)
+        if ($distributeur->etoiles_id < 4) {
             return 0;
         }
-
-        // Calculer le volume de toute la descendance
-        $volumeTotal = $this->calculateVolumeDescendance($distributeurId, $period);
         
-        // Taux de leadership selon le grade
-        $taux = $this->getTauxBonusLeadership($distributeur->etoiles_id);
+        // Calculer le volume total de la descendance
+        $volumeDescendance = $this->calculateVolumeDescendance($distributeurId, $period);
         
-        return $volumeTotal * $taux * 100; // Si 1 point = 100 FCFA
+        // Taux de bonus leadership selon le grade
+        $tauxLeadership = $this->getTauxBonusLeadership($distributeur->etoiles_id);
+        
+        return $volumeDescendance * $tauxLeadership;
     }
 
-    /**
-     * Get indirect bonus rate based on grade
-     */
-    private function getTauxBonusIndirect($grade): float
+    private function getTauxBonusIndirect($grade)
     {
+        // Taux de bonus indirect selon le grade
         $taux = [
             1 => 0.05,
             2 => 0.10,
@@ -304,11 +267,9 @@ class BonusController extends Controller
         return $taux[$grade] ?? 0.05;
     }
 
-    /**
-     * Get leadership bonus rate based on grade
-     */
-    private function getTauxBonusLeadership($grade): float
+    private function getTauxBonusLeadership($grade)
     {
+        // Taux de bonus leadership selon le grade
         $taux = [
             4 => 0.02,
             5 => 0.03,
@@ -321,55 +282,68 @@ class BonusController extends Controller
         
         return $taux[$grade] ?? 0;
     }
-
-    /**
-     * Calculate total volume of downline
-     */
-    private function calculateVolumeDescendance($distributeurId, $period, $niveau = 0, $maxNiveau = 5): float
+    
+    private function calculateVolumeDescendance($distributeurId, $period)
     {
-        if ($niveau >= $maxNiveau) {
-            return 0;
+        // Calculer récursivement le volume total de la descendance
+        $volume = 0;
+        
+        // Récupérer les filleuls directs
+        $filleuls = Distributeur::where('id_distrib_parent', $distributeurId)->get();
+        
+        foreach ($filleuls as $filleul) {
+            // Achats du filleul
+            $volume += Achat::where('distributeur_id', $filleul->id)
+                          ->where('period', $period)
+                          ->sum('pointvaleur');
+            
+            // Récursion pour les sous-filleuls
+            $volume += $this->calculateVolumeDescendance($filleul->id, $period);
         }
         
-        // Volume des filleuls directs
-        $volumeDirect = Achat::whereIn('distributeur_id', function($query) use ($distributeurId) {
-                                $query->select('id')
-                                    ->from('distributeurs')
-                                    ->where('id_distrib_parent', $distributeurId);
-                            })
-                            ->where('period', $period)
-                            ->sum(DB::raw('(points_unitaire_achat * qt)'));
-        
-        // Volume des filleuls indirects (récursif)
-        $filleuls = Distributeur::where('id_distrib_parent', $distributeurId)->pluck('id');
-        $volumeIndirect = 0;
-        
-        foreach ($filleuls as $filleulId) {
-            $volumeIndirect += $this->calculateVolumeDescendance($filleulId, $period, $niveau + 1, $maxNiveau);
-        }
-        
-        return ($volumeDirect ?? 0) + $volumeIndirect;
+        return $volume;
     }
-
-    /**
-     * Generate unique bonus number.
-     */
-    private function generateBonusNumber($period, $distributeurId): string
+    
+    private function generateBonusNumber($period, $distributeurId)
     {
-        // Format: YYYYMM-XXXXX-ID
-        $lastBonus = Bonus::where('period', $period)
-                        ->orderBy('id', 'desc')
-                        ->first();
+        // Format: 7770MMYYXXX où MM=mois, YY=année, XXX=numéro séquentiel
+        $prefix = '7770';
         
-        $sequence = 1;
-        if ($lastBonus && $lastBonus->num) {
-            // Extraire le numéro de séquence si le format est correct
-            $parts = explode('-', $lastBonus->num);
-            if (count($parts) >= 2) {
-                $sequence = intval($parts[1]) + 1;
-            }
+        // Extraire l'année et le mois de la période (format: YYYY-MM)
+        $dateParts = explode('-', $period);
+        $year = substr($dateParts[0], -2); // Prendre les 2 derniers chiffres de l'année
+        $month = $dateParts[1];
+        
+        // Construire le préfixe complet avec mois puis année
+        $fullPrefix = $prefix . $month . $year;
+        
+        // Obtenir le dernier numéro utilisé pour cette période
+        $lastBonus = Bonus::where('period', $period)
+                         ->where('num', 'like', $fullPrefix . '%')
+                         ->orderBy('id', 'desc')
+                         ->first();
+        
+        if ($lastBonus) {
+            // Extraire le numéro séquentiel du dernier bonus
+            $lastSequence = intval(substr($lastBonus->num, -3));
+            $sequence = $lastSequence + 1;
+        } else {
+            // Premier bonus de la période
+            $sequence = 1;
         }
         
-        return sprintf('%s-%05d-%d', str_replace('-', '', $period), $sequence, $distributeurId);
+        // Retourner le numéro complet au format 7770MMYYXXX
+        return $fullPrefix . str_pad($sequence, 3, '0', STR_PAD_LEFT);
+    }
+    
+    private function getAvailablePeriods()
+    {
+        // Obtenir les périodes où il y a des achats
+        $periods = Achat::distinct()
+                      ->orderBy('period', 'desc')
+                      ->pluck('period')
+                      ->toArray();
+        
+        return $periods;
     }
 }

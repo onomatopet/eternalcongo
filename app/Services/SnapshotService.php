@@ -2,12 +2,17 @@
 
 namespace App\Services;
 
-use App\Models\Distributor;    // Modèle pour level_current
-use App\Models\LevelHistory; // Modèle pour level_history
+use App\Models\LevelCurrent;
+use App\Models\LevelCurrentHistory; // Utiliser le bon nom du modèle existant
+use App\Models\Distributeur;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
-use Carbon\Carbon; // Pour gérer les dates/heures
+use Carbon\Carbon;
 
+/**
+ * Service pour créer des snapshots des niveaux des distributeurs.
+ * Un snapshot est une copie de l'état des distributeurs à un moment donné.
+ */
 class SnapshotService
 {
     /**
@@ -29,7 +34,7 @@ class SnapshotService
         }
 
         // Vérifier si un snapshot existe déjà pour cette période
-        $existingSnapshot = LevelHistory::where('period', $period)->exists();
+        $existingSnapshot = LevelCurrentHistory::where('period', $period)->exists();
 
         if ($existingSnapshot && !$force) {
             $message = "Un snapshot existe déjà pour la période {$period}. Utilisez l'option 'forcer' pour écraser.";
@@ -48,12 +53,12 @@ class SnapshotService
             // Si force=true, supprimer l'ancien snapshot
             if ($existingSnapshot && $force) {
                 Log::warning("Suppression du snapshot existant pour la période {$period} (Forcé).");
-                LevelHistory::where('period', $period)->delete();
+                LevelCurrentHistory::where('period', $period)->delete();
             }
 
             // --- Lecture et Écriture par Chunks ---
             // Utiliser chunkById pour traiter les données par lots et éviter les problèmes de mémoire
-            Distributor::orderBy('id') // Important pour chunkById
+            Distributeur::orderBy('id') // Important pour chunkById
                 ->chunkById(500, function ($distributors) use ($period, $snapshotTimestamp, &$recordsCreated) {
 
                     $historyData = [];
@@ -86,7 +91,7 @@ class SnapshotService
 
                     // Insérer le lot dans level_history
                     if (!empty($historyData)) {
-                        LevelHistory::insert($historyData); // Insertion en masse (plus rapide)
+                        LevelCurrentHistory::insert($historyData); // Insertion en masse (plus rapide)
                         $recordsCreated += count($historyData);
                         Log::debug("Snapshot: Lot de " . count($historyData) . " enregistrements inséré pour la période {$period}. Total: {$recordsCreated}");
                     }

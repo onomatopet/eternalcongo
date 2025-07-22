@@ -135,6 +135,9 @@ Route::middleware(['auth', 'verified', 'check_admin_role'])
             Route::get('/{bonus}/edit', [BonusController::class, 'edit'])->name('edit');
             Route::put('/{bonus}', [BonusController::class, 'update'])->name('update');
             Route::delete('/{bonus}', [BonusController::class, 'destroy'])->name('destroy');
+            
+            // Route pour générer le PDF
+            Route::get('/{bonus}/pdf', [BonusController::class, 'generatePdf'])->name('pdf');
 
             // Routes de calcul
             Route::get('/calculate/{period}', [BonusController::class, 'showCalculation'])->name('calculate.show');
