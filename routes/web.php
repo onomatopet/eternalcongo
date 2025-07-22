@@ -2,17 +2,18 @@
 
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\Admin\AchatController;
+use App\Http\Controllers\Admin\AchatReturnController;
 use App\Http\Controllers\Admin\DistributeurController;
 use App\Http\Controllers\Admin\ProcessController;
 use App\Http\Controllers\Admin\ProductController;
 use App\Http\Controllers\Admin\BonusController;
 use App\Http\Controllers\Admin\DeletionRequestController;
-use App\Http\Controllers\Admin\AchatReturnController;
+use App\Http\Controllers\Admin\ModificationRequestController;
 use App\Models\DeletionRequest;
 use App\Models\Distributeur;
 use App\Services\DeletionValidationService;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Http\Request;
 
 require __DIR__.'/auth.php';
@@ -29,6 +30,7 @@ Route::middleware('auth')->group(function () {
 
     // Dashboard principal (pour les utilisateurs connectés)
     Route::get('/dashboard', function () {
+        // Rediriger vers le dashboard admin si l'utilisateur a les permissions admin
         if (Auth::check() && Auth::user()->hasPermission('access_admin')) {
             return redirect()->route('admin.dashboard');
         }
@@ -81,18 +83,6 @@ Route::middleware(['auth', 'verified', 'check_admin_role'])
             Route::get('/search/ajax', [DistributeurController::class, 'search'])->name('search');
         });
 
-        Route::prefix('achat-returns')->name('achat-returns.')->group(function () {
-            Route::get('/', [AchatReturnController::class, 'index'])->name('index');
-            Route::get('/create/{achat}', [AchatReturnController::class, 'create'])->name('create');
-            Route::post('/{achat}', [AchatReturnController::class, 'store'])->name('store');
-            Route::get('/{returnRequest}', [AchatReturnController::class, 'show'])->name('show');
-            Route::post('/{returnRequest}/approve', [AchatReturnController::class, 'approve'])->name('approve');
-            Route::post('/{returnRequest}/reject', [AchatReturnController::class, 'reject'])->name('reject');
-            Route::post('/{returnRequest}/execute', [AchatReturnController::class, 'execute'])->name('execute');
-            Route::delete('/{returnRequest}/cancel', [AchatReturnController::class, 'cancel'])->name('cancel');
-            Route::get('/report/period', [AchatReturnController::class, 'report'])->name('report');
-        });
-
         // ===== GESTION DES ACHATS =====
         Route::prefix('achats')->name('achats.')->group(function () {
             Route::get('/', [AchatController::class, 'index'])->name('index');
@@ -108,6 +98,19 @@ Route::middleware(['auth', 'verified', 'check_admin_role'])
             Route::get('/product-info/ajax', [AchatController::class, 'getProductInfo'])->name('product-info');
         });
 
+        // ===== GESTION DES RETOURS ET ANNULATIONS D'ACHATS =====
+        Route::prefix('achat-returns')->name('achat-returns.')->group(function () {
+            Route::get('/', [AchatReturnController::class, 'index'])->name('index');
+            Route::get('/create/{achat}', [AchatReturnController::class, 'create'])->name('create');
+            Route::post('/{achat}', [AchatReturnController::class, 'store'])->name('store');
+            Route::get('/{returnRequest}', [AchatReturnController::class, 'show'])->name('show');
+            Route::post('/{returnRequest}/approve', [AchatReturnController::class, 'approve'])->name('approve');
+            Route::post('/{returnRequest}/reject', [AchatReturnController::class, 'reject'])->name('reject');
+            Route::post('/{returnRequest}/execute', [AchatReturnController::class, 'execute'])->name('execute');
+            Route::delete('/{returnRequest}/cancel', [AchatReturnController::class, 'cancel'])->name('cancel');
+            Route::get('/report/period', [AchatReturnController::class, 'report'])->name('report');
+        });
+
         // ===== GESTION DES PRODUITS =====
         Route::prefix('products')->name('products.')->group(function () {
             Route::get('/', [ProductController::class, 'index'])->name('index');
@@ -118,6 +121,9 @@ Route::middleware(['auth', 'verified', 'check_admin_role'])
             Route::put('/{product}', [ProductController::class, 'update'])->name('update');
             Route::patch('/{product}', [ProductController::class, 'update']);
             Route::delete('/{product}', [ProductController::class, 'destroy'])->name('destroy');
+
+            // Routes utilitaires
+            Route::get('/search/ajax', [ProductController::class, 'search'])->name('search');
         });
 
         // ===== GESTION DES BONUS =====
@@ -128,65 +134,81 @@ Route::middleware(['auth', 'verified', 'check_admin_role'])
             Route::get('/{bonus}', [BonusController::class, 'show'])->name('show');
             Route::get('/{bonus}/edit', [BonusController::class, 'edit'])->name('edit');
             Route::put('/{bonus}', [BonusController::class, 'update'])->name('update');
-            Route::patch('/{bonus}', [BonusController::class, 'update']);
             Route::delete('/{bonus}', [BonusController::class, 'destroy'])->name('destroy');
 
-            // Génération PDF
-            Route::get('/{bonus}/pdf', [BonusController::class, 'generatePdf'])->name('pdf');
+            // Routes de calcul
+            Route::get('/calculate/{period}', [BonusController::class, 'showCalculation'])->name('calculate.show');
+            Route::post('/calculate/{period}', [BonusController::class, 'calculate'])->name('calculate');
         });
 
-        // ===== PROCESSUS MÉTIER (CALCULS ET TRAITEMENTS) =====
+        // ===== PROCESSUS DE CALCUL =====
         Route::prefix('processes')->name('processes.')->group(function () {
             Route::get('/', [ProcessController::class, 'index'])->name('index');
-
-            // Exécution des processus d'avancement
-            Route::post('/advancements', [ProcessController::class, 'processAdvancements'])
-                ->name('advancements')
-                ->middleware('permission:execute_advancements');
-
-            // Exécution de la régularisation des grades
-            Route::post('/regularization', [ProcessController::class, 'regularizeGrades'])
-                ->name('regularization')
-                ->middleware('permission:execute_regularization');
-
-            // API pour statistiques
-            Route::get('/stats', [ProcessController::class, 'apiStats'])->name('stats');
+            
+            // Interface web pour les processus
+            Route::get('/advancements', [ProcessController::class, 'showAdvancements'])->name('advancements.show');
+            Route::post('/advancements/run', [ProcessController::class, 'runAdvancements'])->name('advancements.run');
+            
+            Route::get('/regularization', [ProcessController::class, 'showRegularization'])->name('regularization.show');
+            Route::post('/regularization/run', [ProcessController::class, 'runRegularization'])->name('regularization.run');
+            
+            Route::get('/recalculation', [ProcessController::class, 'showRecalculation'])->name('recalculation.show');
+            Route::post('/recalculation/run', [ProcessController::class, 'runRecalculation'])->name('recalculation.run');
+            
+            // Historique des exécutions
+            Route::get('/history', [ProcessController::class, 'history'])->name('history');
+            Route::get('/history/{execution}', [ProcessController::class, 'showExecution'])->name('history.show');
         });
 
         // ===== GESTION DES DEMANDES DE SUPPRESSION =====
         Route::prefix('deletion-requests')->name('deletion-requests.')->group(function () {
-
-            // Liste et détails des demandes
+            
+            // Liste et détails
             Route::get('/', [DeletionRequestController::class, 'index'])
                 ->name('index')
                 ->middleware('permission:view_deletion_requests');
-
+            
             Route::get('/{deletionRequest}', [DeletionRequestController::class, 'show'])
                 ->name('show')
                 ->middleware('permission:view_deletion_requests');
-
-            // Actions d'approbation/rejet
+            
+            // Workflow d'approbation
             Route::post('/{deletionRequest}/approve', [DeletionRequestController::class, 'approve'])
                 ->name('approve')
                 ->middleware('permission:approve_deletions');
-
+            
             Route::post('/{deletionRequest}/reject', [DeletionRequestController::class, 'reject'])
                 ->name('reject')
                 ->middleware('permission:approve_deletions');
-
-            // Exécution des suppressions approuvées
+            
             Route::post('/{deletionRequest}/execute', [DeletionRequestController::class, 'execute'])
                 ->name('execute')
                 ->middleware('permission:execute_deletions');
-
-            // Annulation des demandes
-            Route::post('/{deletionRequest}/cancel', [DeletionRequestController::class, 'cancel'])
+            
+            Route::delete('/{deletionRequest}/cancel', [DeletionRequestController::class, 'cancel'])
                 ->name('cancel');
+        });
 
-            // Export des demandes
-            Route::get('/export/csv', [DeletionRequestController::class, 'export'])
-                ->name('export')
-                ->middleware('permission:export_data');
+        // ===== GESTION DES DEMANDES DE MODIFICATION =====
+        Route::prefix('modification-requests')->name('modification-requests.')->group(function () {
+            Route::get('/', [ModificationRequestController::class, 'index'])->name('index');
+            Route::get('/{modificationRequest}', [ModificationRequestController::class, 'show'])->name('show');
+            
+            // Création de demandes spécifiques
+            Route::get('/create/parent-change/{distributeur}', [ModificationRequestController::class, 'createParentChange'])->name('create.parent-change');
+            Route::post('/store/parent-change/{distributeur}', [ModificationRequestController::class, 'storeParentChange'])->name('store.parent-change');
+            
+            Route::get('/create/grade-change/{distributeur}', [ModificationRequestController::class, 'createGradeChange'])->name('create.grade-change');
+            Route::post('/store/grade-change/{distributeur}', [ModificationRequestController::class, 'storeGradeChange'])->name('store.grade-change');
+            
+            // Actions sur les demandes
+            Route::post('/{modificationRequest}/approve', [ModificationRequestController::class, 'approve'])->name('approve');
+            Route::post('/{modificationRequest}/reject', [ModificationRequestController::class, 'reject'])->name('reject');
+            Route::post('/{modificationRequest}/execute', [ModificationRequestController::class, 'execute'])->name('execute');
+            Route::delete('/{modificationRequest}/cancel', [ModificationRequestController::class, 'cancel'])->name('cancel');
+            
+            // Validation AJAX
+            Route::post('/validate', [ModificationRequestController::class, 'validateChange'])->name('validate');
         });
 
         // ===== GESTION DES BACKUPS =====
@@ -251,52 +273,24 @@ Route::middleware(['auth', 'verified', 'check_admin_role'])
 
         // ===== ROUTES DE TEST ET DEBUG (À SUPPRIMER EN PRODUCTION) =====
         Route::prefix('debug')->name('debug.')->group(function () {
-            // Test des contrôleurs
-            Route::get('/test-distributeurs', [DistributeurController::class, 'index'])->name('test.distributeurs');
-            Route::get('/test-achats', [AchatController::class, 'index'])->name('test.achats');
+            if (app()->environment('local', 'development')) {
+                Route::get('/test-deletion-validation/{distributeur}', function(Distributeur $distributeur) {
+                    $validator = app(DeletionValidationService::class);
+                    return response()->json($validator->validateDistributeurDeletion($distributeur));
+                })->name('test-deletion-validation');
 
-            // Test des services
-            Route::get('/test-backup', function() {
-                $backupService = app(\App\Services\BackupService::class);
-                $distributeur = \App\Models\Distributeur::first();
-
-                if (!$distributeur) {
-                    return response()->json(['error' => 'Aucun distributeur trouvé pour test']);
-                }
-
-                $result = $backupService->createDeletionBackup('distributeur', $distributeur->id, []);
-                return response()->json($result);
-            })->name('test.backup');
-
-            Route::get('/test-validation', function() {
-                $validationService = app(\App\Services\DeletionValidationService::class);
-                $distributeur = \App\Models\Distributeur::first();
-
-                if (!$distributeur) {
-                    return response()->json(['error' => 'Aucun distributeur trouvé pour test']);
-                }
-
-                $result = $validationService->validateDistributeurDeletion($distributeur);
-                return response()->json($result);
-            })->name('test.validation');
+                Route::get('/phpinfo', function() {
+                    if (Auth::user() && Auth::user()->hasRole('super_admin')) {
+                        phpinfo();
+                    } else {
+                        abort(403);
+                    }
+                })->name('phpinfo');
+            }
         });
     });
 
-// ===== ROUTES DE GESTION DES ERREURS =====
-
-// Route pour les erreurs 404 personnalisées (optionnel)
+// ===== ROUTES FALLBACK =====
 Route::fallback(function () {
-    if (request()->is('admin/*')) {
-        return response()->view('admin.errors.404', [], 404);
-    }
     return response()->view('errors.404', [], 404);
 });
-
-// ===== ROUTES DE MAINTENANCE =====
-
-// Route de maintenance (à activer quand nécessaire)
-/*
-Route::get('/maintenance', function () {
-    return view('maintenance');
-})->name('maintenance');
-*/
