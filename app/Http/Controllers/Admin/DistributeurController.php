@@ -32,19 +32,21 @@ class DistributeurController extends Controller
      */
     public function index(Request $request): View
     {
+        // Récupérer le terme de recherche
+        $searchTerm = $request->input('search');
+
         // Construire la requête de base
         $distributeurs = Distributeur::with(['parent', 'children'])
             ->orderBy('created_at', 'desc');
 
         // Filtres de recherche
         if ($request->filled('search')) {
-            $search = $request->input('search');
-            $distributeurs->where(function($query) use ($search) {
-                $query->where('nom_distributeur', 'LIKE', "%{$search}%")
-                      ->orWhere('pnom_distributeur', 'LIKE', "%{$search}%")
-                      ->orWhere('distributeur_id', 'LIKE', "%{$search}%")
-                      ->orWhere('tel_distributeur', 'LIKE', "%{$search}%")
-                      ->orWhere('adress_distributeur', 'LIKE', "%{$search}%");
+            $distributeurs->where(function($query) use ($searchTerm) {
+                $query->where('nom_distributeur', 'LIKE', "%{$searchTerm}%")
+                      ->orWhere('pnom_distributeur', 'LIKE', "%{$searchTerm}%")
+                      ->orWhere('distributeur_id', 'LIKE', "%{$searchTerm}%")
+                      ->orWhere('tel_distributeur', 'LIKE', "%{$searchTerm}%")
+                      ->orWhere('adress_distributeur', 'LIKE', "%{$searchTerm}%");
             });
         }
 
@@ -64,7 +66,7 @@ class DistributeurController extends Controller
         // Statistiques pour l'interface
         $stats = $this->getDistributeursStats();
 
-        return view('admin.distributeurs.index', compact('distributeurs', 'stats'));
+        return view('admin.distributeurs.index', compact('distributeurs', 'stats', 'searchTerm'));
     }
 
     /**

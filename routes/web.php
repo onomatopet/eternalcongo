@@ -7,6 +7,7 @@ use App\Http\Controllers\Admin\ProcessController;
 use App\Http\Controllers\Admin\ProductController;
 use App\Http\Controllers\Admin\BonusController;
 use App\Http\Controllers\Admin\DeletionRequestController;
+use App\Http\Controllers\Admin\AchatReturnController;
 use App\Models\DeletionRequest;
 use App\Models\Distributeur;
 use App\Services\DeletionValidationService;
@@ -78,6 +79,18 @@ Route::middleware(['auth', 'verified', 'check_admin_role'])
 
             // Route de recherche AJAX (DOIT être AVANT les routes avec paramètres)
             Route::get('/search/ajax', [DistributeurController::class, 'search'])->name('search');
+        });
+
+        Route::prefix('achat-returns')->name('achat-returns.')->group(function () {
+            Route::get('/', [AchatReturnController::class, 'index'])->name('index');
+            Route::get('/create/{achat}', [AchatReturnController::class, 'create'])->name('create');
+            Route::post('/{achat}', [AchatReturnController::class, 'store'])->name('store');
+            Route::get('/{returnRequest}', [AchatReturnController::class, 'show'])->name('show');
+            Route::post('/{returnRequest}/approve', [AchatReturnController::class, 'approve'])->name('approve');
+            Route::post('/{returnRequest}/reject', [AchatReturnController::class, 'reject'])->name('reject');
+            Route::post('/{returnRequest}/execute', [AchatReturnController::class, 'execute'])->name('execute');
+            Route::delete('/{returnRequest}/cancel', [AchatReturnController::class, 'cancel'])->name('cancel');
+            Route::get('/report/period', [AchatReturnController::class, 'report'])->name('report');
         });
 
         // ===== GESTION DES ACHATS =====

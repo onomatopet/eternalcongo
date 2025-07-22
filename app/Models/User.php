@@ -8,6 +8,13 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use App\Traits\HasPermissions;
 
+/**
+ * @method bool hasPermission(string $permission)
+ * @method bool hasRole(string $role)
+ * @method bool canAccessAdmin()
+ * @method void updateLastLogin()
+ */
+
 class User extends Authenticatable
 {
     use HasFactory, Notifiable, HasPermissions;
