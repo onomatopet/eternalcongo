@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Auth;
 
 /**
  * Modèle pour gérer les demandes de suppression avec workflow d'approbation
@@ -318,5 +319,17 @@ class DeletionRequest extends Model
     {
         // Les demandes sont considérées expirées après 30 jours si toujours en attente
         return $this->isPending() && $this->created_at->addDays(30)->isPast();
+    }
+
+    public static function createForDistributeur(Distributeur $distributeur, string $reason, array $validationResult): self
+    {
+        return self::create([
+            'entity_type' => self::ENTITY_DISTRIBUTEUR,
+            'entity_id' => $distributeur->id,
+            'requested_by_id' => Auth::id(),
+            'status' => self::STATUS_PENDING,
+            'reason' => $reason,
+            'validation_data' => $validationResult,
+        ]);
     }
 }

@@ -270,6 +270,8 @@ class DeletionValidationService
         }
     }
 
+
+
     /**
      * Génère un résumé de la validation
      */
