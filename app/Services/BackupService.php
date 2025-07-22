@@ -5,6 +5,7 @@ namespace App\Services;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Str;
 use Carbon\Carbon;
 
@@ -27,7 +28,7 @@ class BackupService
                 'entity_type' => $entityType,
                 'entity_id' => $entityId,
                 'created_at' => $timestamp->toISOString(),
-                'created_by' => auth()->id(),
+                'created_by' => Auth::id() ?? 0,
                 'entity_data' => $this->getEntityData($entityType, $entityId),
                 'related_data' => $relatedData,
                 'metadata' => [
@@ -49,7 +50,7 @@ class BackupService
                 'entity_id' => $entityId,
                 'backup_data' => json_encode($backupData),
                 'file_path' => $filename,
-                'created_by' => auth()->id(),
+                'created_by' => Auth::id() ?? 0,
                 'created_at' => $timestamp,
                 'updated_at' => $timestamp,
             ]);
@@ -118,7 +119,7 @@ class BackupService
                 ->where('backup_id', $backupId)
                 ->update([
                     'restored_at' => now(),
-                    'restored_by' => auth()->id(),
+                    'restored_by' => Auth::id() ?? 0,
                     'updated_at' => now()
                 ]);
 
