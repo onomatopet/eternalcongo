@@ -10,7 +10,7 @@
         <div class="px-6 py-4 border-b border-gray-200">
             <h1 class="text-2xl font-semibold text-gray-900">Demandes de Modification</h1>
         </div>
-        
+
         {{-- Statistiques --}}
         <div class="grid grid-cols-1 md:grid-cols-3 gap-6 p-6">
             <div class="bg-yellow-50 rounded-lg p-4">
@@ -26,7 +26,7 @@
                     </div>
                 </div>
             </div>
-            
+
             <div class="bg-red-50 rounded-lg p-4">
                 <div class="flex items-center">
                     <div class="flex-shrink-0">
@@ -40,7 +40,7 @@
                     </div>
                 </div>
             </div>
-            
+
             <div class="bg-orange-50 rounded-lg p-4">
                 <div class="flex items-center">
                     <div class="flex-shrink-0">
@@ -70,7 +70,7 @@
                     <option value="executed" {{ request('status') === 'executed' ? 'selected' : '' }}>Exécutée</option>
                 </select>
             </div>
-            
+
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-2">Type</label>
                 <select name="type" class="form-select w-full">
@@ -81,7 +81,7 @@
                     <option value="reassign_children" {{ request('type') === 'reassign_children' ? 'selected' : '' }}>Réassignation d'enfants</option>
                 </select>
             </div>
-            
+
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-2">Niveau de risque</label>
                 <select name="risk_level" class="form-select w-full">
@@ -92,7 +92,7 @@
                     <option value="critical" {{ request('risk_level') === 'critical' ? 'selected' : '' }}>Critique</option>
                 </select>
             </div>
-            
+
             <div class="flex items-end">
                 <button type="submit" class="btn btn-primary w-full">Filtrer</button>
             </div>
@@ -133,7 +133,7 @@
                             </span>
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap">
-                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
+                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full
                                 {{ $modification->status === 'pending' ? 'bg-yellow-100 text-yellow-800' : '' }}
                                 {{ $modification->status === 'approved' ? 'bg-green-100 text-green-800' : '' }}
                                 {{ $modification->status === 'rejected' ? 'bg-red-100 text-red-800' : '' }}
@@ -168,7 +168,7 @@
                 </tbody>
             </table>
         </div>
-        
+
         {{-- Pagination --}}
         <div class="px-6 py-4 border-t border-gray-200">
             {{ $modifications->links() }}
@@ -188,7 +188,7 @@
         <div class="px-6 py-4 border-b border-gray-200">
             <h1 class="text-2xl font-semibold text-gray-900">Demande de changement de parent</h1>
         </div>
-        
+
         {{-- Informations du distributeur --}}
         <div class="p-6 bg-gray-50">
             <h2 class="text-lg font-medium text-gray-900 mb-4">Distributeur concerné</h2>
@@ -217,11 +217,11 @@
                 </div>
             </div>
         </div>
-        
+
         {{-- Formulaire --}}
         <form method="POST" action="{{ route('admin.modification-requests.store.parent-change', $distributeur) }}" class="p-6">
             @csrf
-            
+
             {{-- Nouveau parent --}}
             <div class="mb-6">
                 <label class="block text-sm font-medium text-gray-700 mb-2">
@@ -241,19 +241,19 @@
                     <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
                 @enderror
             </div>
-            
+
             {{-- Raison --}}
             <div class="mb-6">
                 <label class="block text-sm font-medium text-gray-700 mb-2">
                     Raison du changement <span class="text-red-500">*</span>
                 </label>
-                <textarea name="reason" rows="3" class="form-textarea w-full" required 
+                <textarea name="reason" rows="3" class="form-textarea w-full" required
                           placeholder="Expliquez pourquoi ce changement est nécessaire...">{{ old('reason') }}</textarea>
                 @error('reason')
                     <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
                 @enderror
             </div>
-            
+
             {{-- Validation en temps réel --}}
             <div id="validation-result" class="mb-6" style="display: none;">
                 <div class="border rounded-lg p-4">
@@ -261,7 +261,7 @@
                     <div id="validation-content"></div>
                 </div>
             </div>
-            
+
             {{-- Avertissements --}}
             <div class="mb-6">
                 <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
@@ -274,7 +274,7 @@
                     </ul>
                 </div>
             </div>
-            
+
             {{-- Boutons --}}
             <div class="flex justify-end space-x-3">
                 <a href="{{ route('admin.distributeurs.show', $distributeur) }}" class="btn btn-secondary">
@@ -294,13 +294,13 @@ document.addEventListener('DOMContentLoaded', function() {
     const parentSelect = document.getElementById('new_parent_id');
     const validationResult = document.getElementById('validation-result');
     const validationContent = document.getElementById('validation-content');
-    
+
     parentSelect.addEventListener('change', function() {
         if (!this.value) {
             validationResult.style.display = 'none';
             return;
         }
-        
+
         // Validation en temps réel
         fetch('{{ route('admin.modification-requests.validate') }}', {
             method: 'POST',
@@ -317,9 +317,9 @@ document.addEventListener('DOMContentLoaded', function() {
         .then(response => response.json())
         .then(data => {
             validationResult.style.display = 'block';
-            
+
             let html = '';
-            
+
             if (!data.is_valid) {
                 html += '<div class="text-red-600 mb-2">';
                 html += '<strong>Blocages:</strong><ul class="list-disc list-inside">';
@@ -328,7 +328,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 });
                 html += '</ul></div>';
             }
-            
+
             if (data.warnings && data.warnings.length > 0) {
                 html += '<div class="text-orange-600 mb-2">';
                 html += '<strong>Avertissements:</strong><ul class="list-disc list-inside">';
@@ -337,7 +337,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 });
                 html += '</ul></div>';
             }
-            
+
             if (data.impact) {
                 html += '<div class="text-blue-600">';
                 html += '<strong>Impact:</strong><ul class="list-disc list-inside">';
@@ -349,7 +349,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
                 html += '</ul></div>';
             }
-            
+
             validationContent.innerHTML = html;
         })
         .catch(error => {
@@ -373,7 +373,7 @@ document.addEventListener('DOMContentLoaded', function() {
         <div class="px-6 py-4 border-b border-gray-200">
             <h1 class="text-2xl font-semibold text-gray-900">Demande de changement de grade</h1>
         </div>
-        
+
         {{-- Informations du distributeur --}}
         <div class="p-6 bg-gray-50">
             <h2 class="text-lg font-medium text-gray-900 mb-4">Distributeur concerné</h2>
@@ -403,11 +403,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 </div>
             </div>
         </div>
-        
+
         {{-- Formulaire --}}
         <form method="POST" action="{{ route('admin.modification-requests.store.grade-change', $distributeur) }}" class="p-6">
             @csrf
-            
+
             {{-- Nouveau grade --}}
             <div class="mb-6">
                 <label class="block text-sm font-medium text-gray-700 mb-2">
@@ -427,25 +427,25 @@ document.addEventListener('DOMContentLoaded', function() {
                     <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
                 @enderror
             </div>
-            
+
             {{-- Raison --}}
             <div class="mb-6">
                 <label class="block text-sm font-medium text-gray-700 mb-2">
                     Raison du changement <span class="text-red-500">*</span>
                 </label>
-                <textarea name="reason" rows="3" class="form-textarea w-full" required 
+                <textarea name="reason" rows="3" class="form-textarea w-full" required
                           placeholder="Expliquez pourquoi ce changement de grade est nécessaire...">{{ old('reason') }}</textarea>
                 @error('reason')
                     <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
                 @enderror
             </div>
-            
+
             {{-- Justification (conditionnelle) --}}
             <div id="justification-field" class="mb-6" style="display: none;">
                 <label class="block text-sm font-medium text-gray-700 mb-2">
                     Justification détaillée <span class="text-red-500">*</span>
                 </label>
-                <textarea name="justification" rows="5" class="form-textarea w-full" 
+                <textarea name="justification" rows="5" class="form-textarea w-full"
                           placeholder="Ce changement de grade important nécessite une justification détaillée...">{{ old('justification') }}</textarea>
                 <p class="mt-1 text-sm text-gray-600">
                     Un changement de plus de 2 grades nécessite une justification approfondie.
@@ -454,7 +454,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
                 @enderror
             </div>
-            
+
             {{-- Validation en temps réel --}}
             <div id="validation-result" class="mb-6" style="display: none;">
                 <div class="border rounded-lg p-4">
@@ -462,7 +462,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     <div id="validation-content"></div>
                 </div>
             </div>
-            
+
             {{-- Avertissements --}}
             <div class="mb-6">
                 <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
@@ -475,7 +475,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     </ul>
                 </div>
             </div>
-            
+
             {{-- Boutons --}}
             <div class="flex justify-end space-x-3">
                 <a href="{{ route('admin.distributeurs.show', $distributeur) }}" class="btn btn-secondary">
@@ -497,17 +497,17 @@ document.addEventListener('DOMContentLoaded', function() {
     const validationResult = document.getElementById('validation-result');
     const validationContent = document.getElementById('validation-content');
     const currentGrade = {{ $distributeur->etoiles_id }};
-    
+
     gradeSelect.addEventListener('change', function() {
         if (!this.value) {
             validationResult.style.display = 'none';
             justificationField.style.display = 'none';
             return;
         }
-        
+
         const newGrade = parseInt(this.value);
         const gradeDiff = Math.abs(newGrade - currentGrade);
-        
+
         // Afficher le champ justification si nécessaire
         if (gradeDiff > 2) {
             justificationField.style.display = 'block';
@@ -516,7 +516,7 @@ document.addEventListener('DOMContentLoaded', function() {
             justificationField.style.display = 'none';
             justificationField.querySelector('textarea').required = false;
         }
-        
+
         // Validation en temps réel
         fetch('{{ route('admin.modification-requests.validate') }}', {
             method: 'POST',
@@ -533,9 +533,9 @@ document.addEventListener('DOMContentLoaded', function() {
         .then(response => response.json())
         .then(data => {
             validationResult.style.display = 'block';
-            
+
             let html = '';
-            
+
             if (data.warnings && data.warnings.length > 0) {
                 html += '<div class="text-orange-600 mb-2">';
                 html += '<strong>Avertissements:</strong><ul class="list-disc list-inside">';
@@ -544,7 +544,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 });
                 html += '</ul></div>';
             }
-            
+
             if (data.impact) {
                 html += '<div class="text-blue-600">';
                 html += '<strong>Impact:</strong><ul class="list-disc list-inside">';
@@ -556,13 +556,13 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
                 html += '</ul></div>';
             }
-            
+
             if (data.justification_required) {
                 html += '<div class="text-red-600 mt-2">';
                 html += '<strong>Justification requise pour ce changement important</strong>';
                 html += '</div>';
             }
-            
+
             validationContent.innerHTML = html;
         })
         .catch(error => {
