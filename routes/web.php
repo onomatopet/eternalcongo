@@ -240,11 +240,33 @@ Route::middleware(['auth', 'verified', 'check_admin_role'])
             Route::get('/{deletionRequest}', [DeletionRequestController::class, 'show'])->name('show');
             Route::post('/{deletionRequest}/approve', [DeletionRequestController::class, 'approve'])->name('approve');
             Route::post('/{deletionRequest}/reject', [DeletionRequestController::class, 'reject'])->name('reject');
-            Route::post('/{deletionRequest}/execute', [DeletionRequestController::class, 'execute'])->name('execute'); // AJOUTER CETTE LIGNE
+            Route::post('/{deletionRequest}/execute', [DeletionRequestController::class, 'execute'])->name('execute');
             Route::post('/{deletionRequest}/cancel', [DeletionRequestController::class, 'cancel'])->name('cancel');
             Route::get('/backups', [DeletionRequestController::class, 'backups'])->name('backups');
             Route::post('/restore-backup', [DeletionRequestController::class, 'restoreBackup'])->name('restore-backup');
             Route::get('/export', [DeletionRequestController::class, 'export'])->name('export');
+        });
+
+        // ===== GESTION DES DEMANDES DE MODIFICATION =====
+        Route::prefix('modification-requests')->name('modification-requests.')->group(function () {
+            Route::get('/', [ModificationRequestController::class, 'index'])->name('index');
+            Route::get('/{modificationRequest}', [ModificationRequestController::class, 'show'])->name('show');
+
+            // Création de demandes spécifiques
+            Route::get('/create/parent-change/{distributeur}', [ModificationRequestController::class, 'createParentChange'])->name('create.parent-change');
+            Route::post('/store/parent-change/{distributeur}', [ModificationRequestController::class, 'storeParentChange'])->name('store.parent-change');
+
+            Route::get('/create/grade-change/{distributeur}', [ModificationRequestController::class, 'createGradeChange'])->name('create.grade-change');
+            Route::post('/store/grade-change/{distributeur}', [ModificationRequestController::class, 'storeGradeChange'])->name('store.grade-change');
+
+            // Actions sur les demandes
+            Route::post('/{modificationRequest}/approve', [ModificationRequestController::class, 'approve'])->name('approve');
+            Route::post('/{modificationRequest}/reject', [ModificationRequestController::class, 'reject'])->name('reject');
+            Route::post('/{modificationRequest}/execute', [ModificationRequestController::class, 'execute'])->name('execute');
+            Route::delete('/{modificationRequest}/cancel', [ModificationRequestController::class, 'cancel'])->name('cancel');
+
+            // Validation AJAX
+            Route::post('/validate', [ModificationRequestController::class, 'validateChange'])->name('validate');
         });
     });
 
