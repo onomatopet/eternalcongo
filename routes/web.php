@@ -136,7 +136,7 @@ Route::middleware(['auth', 'verified', 'check_admin_role'])
             Route::get('/{bonus}/edit', [BonusController::class, 'edit'])->name('edit');
             Route::put('/{bonus}', [BonusController::class, 'update'])->name('update');
             Route::delete('/{bonus}', [BonusController::class, 'destroy'])->name('destroy');
-            
+
             // Route pour générer le PDF
             Route::get('/{bonus}/pdf', [BonusController::class, 'generatePdf'])->name('pdf');
 
@@ -148,13 +148,13 @@ Route::middleware(['auth', 'verified', 'check_admin_role'])
         // ===== PROCESSUS DE CALCUL =====
         Route::prefix('processes')->name('processes.')->group(function () {
             Route::get('/', [ProcessController::class, 'index'])->name('index');
-            
+
             // Routes pour les avancements
             Route::post('/advancements', [ProcessController::class, 'processAdvancements'])->name('advancements');
-            
+
             // Routes pour la régularisation
             Route::post('/regularization', [ProcessController::class, 'regularizeGrades'])->name('regularization');
-            
+
             // Historique des exécutions (si vous avez ces méthodes)
             Route::get('/history', [ProcessController::class, 'history'])->name('history');
         });
@@ -177,20 +177,20 @@ Route::middleware(['auth', 'verified', 'check_admin_role'])
         Route::prefix('modification-requests')->name('modification-requests.')->group(function () {
             Route::get('/', [ModificationRequestController::class, 'index'])->name('index');
             Route::get('/{modificationRequest}', [ModificationRequestController::class, 'show'])->name('show');
-            
+
             // Création de demandes spécifiques
             Route::get('/create/parent-change/{distributeur}', [ModificationRequestController::class, 'createParentChange'])->name('create.parent-change');
             Route::post('/store/parent-change/{distributeur}', [ModificationRequestController::class, 'storeParentChange'])->name('store.parent-change');
-            
+
             Route::get('/create/grade-change/{distributeur}', [ModificationRequestController::class, 'createGradeChange'])->name('create.grade-change');
             Route::post('/store/grade-change/{distributeur}', [ModificationRequestController::class, 'storeGradeChange'])->name('store.grade-change');
-            
+
             // Actions sur les demandes
             Route::post('/{modificationRequest}/approve', [ModificationRequestController::class, 'approve'])->name('approve');
             Route::post('/{modificationRequest}/reject', [ModificationRequestController::class, 'reject'])->name('reject');
             Route::post('/{modificationRequest}/execute', [ModificationRequestController::class, 'execute'])->name('execute');
             Route::delete('/{modificationRequest}/cancel', [ModificationRequestController::class, 'cancel'])->name('cancel');
-            
+
             // Validation AJAX
             Route::post('/validate', [ModificationRequestController::class, 'validateChange'])->name('validate');
         });
@@ -211,13 +211,13 @@ Route::middleware(['auth', 'verified', 'check_admin_role'])
 
         // ===== ROUTES API POUR AJAX =====
         Route::prefix('api')->name('api.')->group(function () {
-            
+
             // Recherche de distributeurs
             Route::get('/distributeurs/search', [DistributeurController::class, 'apiSearch'])->name('distributeurs.search');
-            
+
             // Informations produit
             Route::get('/products/{product}/info', [ProductController::class, 'apiGetInfo'])->name('products.info');
-            
+
             // Routes commentées temporairement si les méthodes n'existent pas
             /*
             // Validation de suppression
@@ -225,13 +225,26 @@ Route::middleware(['auth', 'verified', 'check_admin_role'])
                 $validationService = app(DeletionValidationService::class);
                 return response()->json($validationService->validateDeletion($distributeur));
             })->name('distributeurs.validate-deletion');
-            
+
             // Impact de suppression
             Route::post('/distributeurs/{distributeur}/deletion-impact', function (Distributeur $distributeur) {
                 $validationService = app(DeletionValidationService::class);
                 return response()->json($validationService->getDeletionImpact($distributeur));
             })->name('distributeurs.deletion-impact');
             */
+        });
+
+        // ===== GESTION DES DEMANDES DE SUPPRESSION =====
+        Route::prefix('deletion-requests')->name('deletion-requests.')->group(function () {
+            Route::get('/', [DeletionRequestController::class, 'index'])->name('index');
+            Route::get('/{deletionRequest}', [DeletionRequestController::class, 'show'])->name('show');
+            Route::post('/{deletionRequest}/approve', [DeletionRequestController::class, 'approve'])->name('approve');
+            Route::post('/{deletionRequest}/reject', [DeletionRequestController::class, 'reject'])->name('reject');
+            Route::post('/{deletionRequest}/execute', [DeletionRequestController::class, 'execute'])->name('execute'); // AJOUTER CETTE LIGNE
+            Route::post('/{deletionRequest}/cancel', [DeletionRequestController::class, 'cancel'])->name('cancel');
+            Route::get('/backups', [DeletionRequestController::class, 'backups'])->name('backups');
+            Route::post('/restore-backup', [DeletionRequestController::class, 'restoreBackup'])->name('restore-backup');
+            Route::get('/export', [DeletionRequestController::class, 'export'])->name('export');
         });
     });
 

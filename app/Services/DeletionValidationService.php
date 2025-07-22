@@ -4,208 +4,177 @@ namespace App\Services;
 
 use App\Models\Distributeur;
 use App\Models\Achat;
+use App\Models\Product;
 use App\Models\Bonus;
 use App\Models\LevelCurrent;
+use App\Models\AvancementHistory;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class DeletionValidationService
 {
     /**
-     * Valide si un distributeur peut être supprimé
+     * Valide la suppression d'un distributeur
      */
     public function validateDistributeurDeletion(Distributeur $distributeur): array
     {
-        $validationResult = [
-            'can_delete' => true,
-            'warnings' => [],
-            'blockers' => [],
-            'related_data' => [],
-            'impact_analysis' => []
-        ];
+        $blockers = [];
+        $warnings = [];
+        $relatedData = [];
 
         // 1. Vérifier les enfants directs
-        $children = $distributeur->children()->with(['achats', 'bonuses'])->get();
+        $children = Distributeur::where('parent_id', $distributeur->id)->get();
         if ($children->count() > 0) {
-            $validationResult['blockers'][] = [
-                'type' => 'children_exist',
-                'message' => "Ce distributeur a {$children->count()} enfant(s) direct(s) dans le réseau",
-                'details' => $children->map(fn($child) => [
-                    'id' => $child->id,
-                    'matricule' => $child->distributeur_id,
-                    'nom' => $child->full_name,
-                    'achats_count' => $child->achats->count(),
-                    'bonus_count' => $child->bonuses->count()
-                ])->toArray(),
-                'suggested_action' => 'Réassigner les enfants à un autre parent ou les supprimer d\'abord'
-            ];
-            $validationResult['can_delete'] = false;
+            $blockers[] = "Ce distributeur a {$children->count()} distributeur(s) enfant(s) qui doivent être réassignés";
+            $relatedData['children'] = $children->toArray();
         }
 
         // 2. Vérifier les achats
-        $achats = $distributeur->achats()->get();
+        $achats = Achat::where('distributeur_id', $distributeur->id)->get();
         if ($achats->count() > 0) {
-            $totalMontant = $achats->sum('montant_total_ligne');
-            $periodesImpactees = $achats->pluck('period')->unique();
-            
-            $validationResult['blockers'][] = [
-                'type' => 'achats_exist',
-                'message' => "Ce distributeur a {$achats->count()} achat(s) enregistré(s)",
-                'details' => [
-                    'total_achats' => $achats->count(),
-                    'montant_total' => $totalMontant,
-                    'periodes_impactees' => $periodesImpactees->toArray(),
-                    'dernier_achat' => optional($achats->sortByDesc('created_at')->first())->created_at
-                ],
-                'suggested_action' => 'Supprimer ou archiver les achats d\'abord'
-            ];
-            $validationResult['can_delete'] = false;
-            $validationResult['related_data']['achats'] = $achats->toArray();
+            $totalAmount = $achats->sum('montant_total_ligne');
+            $warnings[] = "Ce distributeur a {$achats->count()} achat(s) pour un montant total de " . number_format($totalAmount, 0, ',', ' ') . " F CFA";
+            $relatedData['achats'] = $achats->toArray();
         }
 
         // 3. Vérifier les bonus
-        $bonuses = $distributeur->bonuses()->get();
+        $bonuses = Bonus::where('distributeur_id', $distributeur->id)->get();
         if ($bonuses->count() > 0) {
-            $totalBonus = $bonuses->sum('montant');
-            
-            $validationResult['blockers'][] = [
-                'type' => 'bonuses_exist',
-                'message' => "Ce distributeur a {$bonuses->count()} bonus enregistré(s)",
-                'details' => [
-                    'total_bonus' => $bonuses->count(),
-                    'montant_total' => $totalBonus,
-                    'dernier_bonus' => optional($bonuses->sortByDesc('created_at')->first())->created_at
-                ],
-                'suggested_action' => 'Vérifier et archiver les bonus d\'abord'
-            ];
-            $validationResult['can_delete'] = false;
-            $validationResult['related_data']['bonuses'] = $bonuses->toArray();
+            $totalBonus = $bonuses->sum('montant_total');
+            $warnings[] = "Ce distributeur a reçu {$bonuses->count()} bonus pour un montant total de " . number_format($totalBonus, 0, ',', ' ') . " F CFA";
+            $relatedData['bonuses'] = $bonuses->toArray();
         }
 
-        // 4. Vérifier les données de niveau actuel
-        $levelCurrents = $distributeur->levelCurrents()->get();
-        if ($levelCurrents->count() > 0) {
-            $validationResult['warnings'][] = [
-                'type' => 'level_currents_exist',
-                'message' => "Ce distributeur a des données de performance sur {$levelCurrents->count()} période(s)",
-                'details' => $levelCurrents->map(fn($lc) => [
-                    'period' => $lc->period,
-                    'etoiles' => $lc->etoiles,
-                    'cumul_individuel' => $lc->cumul_individuel,
-                    'cumul_collectif' => $lc->cumul_collectif
-                ])->toArray(),
-                'suggested_action' => 'Ces données seront archivées lors de la suppression'
-            ];
-            $validationResult['related_data']['level_currents'] = $levelCurrents->toArray();
+        // 4. Vérifier le niveau actuel
+        $currentLevel = LevelCurrent::where('distributeur_id', $distributeur->id)->first();
+        if ($currentLevel && $currentLevel->etoiles >= 3) {
+            $warnings[] = "Ce distributeur a un grade élevé ({$currentLevel->etoiles} étoiles)";
         }
 
-        // 5. Analyser l'impact sur la hiérarchie
-        $this->analyzeHierarchyImpact($distributeur, $validationResult);
+        // 5. Vérifier l'historique des avancements
+        $advancements = AvancementHistory::where('distributeur_id', $distributeur->id)->count();
+        if ($advancements > 0) {
+            $warnings[] = "Ce distributeur a {$advancements} avancement(s) dans l'historique";
+        }
 
-        // 6. Vérifier les dépendances dans d'autres tables
-        $this->checkOtherDependencies($distributeur, $validationResult);
+        // 6. Vérifier si c'est un top performer
+        $isTopPerformer = $this->checkIfTopPerformer($distributeur);
+        if ($isTopPerformer) {
+            $warnings[] = "Ce distributeur fait partie des top performers du réseau";
+        }
 
-        return $validationResult;
+        // 7. Calculer l'impact sur le réseau
+        $networkImpact = $this->calculateNetworkImpact($distributeur);
+        if ($networkImpact['affected_count'] > 10) {
+            $warnings[] = "La suppression affectera {$networkImpact['affected_count']} distributeurs dans le réseau";
+        }
+
+        // Déterminer si la suppression est possible
+        $canDelete = count($blockers) === 0;
+        $requiresApproval = count($warnings) > 0 || count($blockers) > 0;
+
+        // Calculer le niveau d'impact
+        $impactLevel = $this->calculateImpactLevel($blockers, $warnings, $relatedData);
+
+        return [
+            'can_delete' => $canDelete,
+            'requires_approval' => $requiresApproval,
+            'blockers' => $blockers,
+            'warnings' => $warnings,
+            'impact_level' => $impactLevel,
+            'related_data' => $relatedData,
+            'network_impact' => $networkImpact,
+            'summary' => $this->generateSummary($distributeur, $blockers, $warnings)
+        ];
     }
 
     /**
-     * Analyse l'impact sur la hiérarchie
+     * Valide la suppression d'un achat
      */
-    private function analyzeHierarchyImpact(Distributeur $distributeur, array &$validationResult): void
+    public function validateAchatDeletion(Achat $achat): array
     {
-        // Analyser la profondeur de l'arbre en cas de suppression
-        $descendants = $this->getAllDescendants($distributeur);
-        $descendantsCount = $descendants->count();
+        $blockers = [];
+        $warnings = [];
+        $relatedData = [];
 
-        if ($descendantsCount > 0) {
-            $validationResult['impact_analysis']['hierarchy'] = [
-                'total_descendants' => $descendantsCount,
-                'max_depth' => $this->calculateMaxDepth($descendants),
-                'active_descendants' => $descendants->filter(function($desc) {
-                    return $desc->achats()->where('period', date('Y-m'))->exists();
-                })->count(),
-                'warning' => $descendantsCount > 10 ? 'Impact majeur sur la hiérarchie' : 'Impact mineur'
-            ];
-
-            if ($descendantsCount > 50) {
-                $validationResult['warnings'][] = [
-                    'type' => 'major_hierarchy_impact',
-                    'message' => "La suppression affectera {$descendantsCount} distributeurs dans la descendance",
-                    'suggested_action' => 'Considérer une désactivation plutôt qu\'une suppression'
-                ];
-            }
+        // 1. Vérifier si l'achat est validé
+        if ($achat->validated) {
+            $warnings[] = "Cet achat a déjà été validé et pris en compte dans les calculs";
         }
 
-        // Vérifier si c'est un nœud important dans la hiérarchie
-        if ($distributeur->children()->count() > 5) {
-            $validationResult['warnings'][] = [
-                'type' => 'important_node',
-                'message' => 'Ce distributeur est un nœud important avec plusieurs enfants directs',
-                'suggested_action' => 'Vérifier la réorganisation de la hiérarchie'
-            ];
+        // 2. Vérifier la période
+        $currentPeriod = date('Y-m');
+        if ($achat->period === $currentPeriod) {
+            $warnings[] = "Cet achat appartient à la période en cours";
         }
+
+        // 3. Vérifier l'impact sur les bonus
+        $relatedBonuses = Bonus::where('period', $achat->period)
+            ->where('distributeur_id', $achat->distributeur_id)
+            ->exists();
+
+        if ($relatedBonuses) {
+            $blockers[] = "Des bonus ont déjà été calculés pour cette période. Recalcul nécessaire après suppression";
+        }
+
+        // 4. Vérifier l'impact sur les grades
+        $levelHistory = LevelCurrent::where('distributeur_id', $achat->distributeur_id)
+            ->where('period', $achat->period)
+            ->first();
+
+        if ($levelHistory) {
+            $warnings[] = "La suppression pourrait affecter le grade du distributeur pour cette période";
+        }
+
+        // 5. Calculer l'impact financier
+        $financialImpact = [
+            'montant' => $achat->montant_total_ligne,
+            'pv' => $achat->pv_total,
+            'period' => $achat->period
+        ];
+        $relatedData['financial_impact'] = $financialImpact;
+
+        $canDelete = count($blockers) === 0;
+        $requiresApproval = $achat->validated || count($warnings) > 0;
+        $impactLevel = $this->calculateImpactLevel($blockers, $warnings, $relatedData);
+
+        return [
+            'can_delete' => $canDelete,
+            'requires_approval' => $requiresApproval,
+            'blockers' => $blockers,
+            'warnings' => $warnings,
+            'impact_level' => $impactLevel,
+            'related_data' => $relatedData,
+            'summary' => "Suppression de l'achat #{$achat->id} - Montant: " . number_format($achat->montant_total_ligne, 0, ',', ' ') . " F CFA"
+        ];
     }
 
     /**
-     * Vérifier les dépendances dans d'autres tables
-     */
-    private function checkOtherDependencies(Distributeur $distributeur, array &$validationResult): void
-    {
-        // Vérifier les références dans level_current_histories
-        $historyCount = DB::table('level_current_histories')
-            ->where('distributeur_id', $distributeur->id)
-            ->count();
-
-        if ($historyCount > 0) {
-            $validationResult['warnings'][] = [
-                'type' => 'history_records',
-                'message' => "{$historyCount} enregistrement(s) d'historique seront orphelins",
-                'suggested_action' => 'Ces enregistrements seront conservés pour l\'audit'
-            ];
-        }
-
-        // Vérifier si le distributeur est référencé comme parent
-        $isParentCount = Distributeur::where('id_distrib_parent', $distributeur->id)->count();
-        if ($isParentCount > 0) {
-            // Ce cas est déjà couvert par la vérification des enfants, mais on l'ajoute pour la cohérence
-            $validationResult['related_data']['as_parent'] = $isParentCount;
-        }
-    }
-
-    /**
-     * Propose des actions de nettoyage avant suppression
+     * Suggère des actions de nettoyage
      */
     public function suggestCleanupActions(array $validationResult): array
     {
         $actions = [];
 
         foreach ($validationResult['blockers'] as $blocker) {
-            switch ($blocker['type']) {
-                case 'children_exist':
-                    $actions[] = [
-                        'action' => 'reassign_children',
-                        'description' => 'Réassigner les enfants à un autre parent',
-                        'priority' => 'high',
-                        'estimated_time' => '5-10 minutes'
-                    ];
-                    break;
+            if (strpos($blocker, 'enfant') !== false) {
+                $actions[] = [
+                    'type' => 'reassign_children',
+                    'description' => 'Réassigner les distributeurs enfants à un autre parent',
+                    'priority' => 'high',
+                    'action_url' => route('admin.distributeurs.reassign-children')
+                ];
+            }
+        }
 
-                case 'achats_exist':
-                    $actions[] = [
-                        'action' => 'archive_achats',
-                        'description' => 'Archiver ou supprimer les achats existants',
-                        'priority' => 'high',
-                        'estimated_time' => '2-5 minutes'
-                    ];
-                    break;
-
-                case 'bonuses_exist':
-                    $actions[] = [
-                        'action' => 'handle_bonuses',
-                        'description' => 'Vérifier et traiter les bonus existants',
-                        'priority' => 'medium',
-                        'estimated_time' => '5-15 minutes'
-                    ];
-                    break;
+        foreach ($validationResult['warnings'] as $warning) {
+            if (strpos($warning, 'bonus') !== false) {
+                $actions[] = [
+                    'type' => 'recalculate_bonuses',
+                    'description' => 'Recalculer les bonus après suppression',
+                    'priority' => 'medium',
+                    'action_url' => route('admin.bonuses.recalculate')
+                ];
             }
         }
 
@@ -213,36 +182,115 @@ class DeletionValidationService
     }
 
     /**
-     * Utilitaires privés
+     * Vérifie si un distributeur est un top performer
      */
-    private function getAllDescendants(Distributeur $distributeur): \Illuminate\Database\Eloquent\Collection
+    private function checkIfTopPerformer(Distributeur $distributeur): bool
+    {
+        // Top 10 par cumul collectif
+        $topByCumul = LevelCurrent::where('period', date('Y-m'))
+            ->orderBy('cumul_collectif', 'desc')
+            ->limit(10)
+            ->pluck('distributeur_id')
+            ->contains($distributeur->id);
+
+        // Top 10 par grade
+        $topByGrade = LevelCurrent::where('period', date('Y-m'))
+            ->orderBy('etoiles', 'desc')
+            ->orderBy('cumul_collectif', 'desc')
+            ->limit(10)
+            ->pluck('distributeur_id')
+            ->contains($distributeur->id);
+
+        return $topByCumul || $topByGrade;
+    }
+
+    /**
+     * Calcule l'impact sur le réseau
+     */
+    private function calculateNetworkImpact(Distributeur $distributeur): array
+    {
+        $affectedIds = collect([$distributeur->id]);
+
+        // Récupérer tous les descendants
+        $descendants = $this->getAllDescendants($distributeur->id);
+        $affectedIds = $affectedIds->merge($descendants);
+
+        // Récupérer les parents jusqu'à la racine
+        $currentParentId = $distributeur->parent_id;
+        while ($currentParentId) {
+            $affectedIds->push($currentParentId);
+            $parent = Distributeur::find($currentParentId);
+            $currentParentId = $parent ? $parent->parent_id : null;
+        }
+
+        return [
+            'affected_count' => $affectedIds->unique()->count(),
+            'descendants_count' => $descendants->count(),
+            'affected_ids' => $affectedIds->unique()->values()->toArray()
+        ];
+    }
+
+    /**
+     * Récupère tous les descendants d'un distributeur
+     */
+    private function getAllDescendants(int $distributeurId): \Illuminate\Support\Collection
     {
         $descendants = collect();
-        $this->collectDescendants($distributeur, $descendants);
+        $children = Distributeur::where('parent_id', $distributeurId)->pluck('id');
+
+        foreach ($children as $childId) {
+            $descendants->push($childId);
+            $descendants = $descendants->merge($this->getAllDescendants($childId));
+        }
+
         return $descendants;
     }
 
-    private function collectDescendants(Distributeur $distributeur, &$descendants): void
+    /**
+     * Calcule le niveau d'impact
+     */
+    private function calculateImpactLevel(array $blockers, array $warnings, array $relatedData): string
     {
-        $children = $distributeur->children()->with('achats')->get();
-        
-        foreach ($children as $child) {
-            $descendants->push($child);
-            $this->collectDescendants($child, $descendants);
+        if (count($blockers) > 0) {
+            return 'critical';
+        }
+
+        $score = 0;
+        $score += count($warnings) * 2;
+        $score += isset($relatedData['children']) ? count($relatedData['children']) * 3 : 0;
+        $score += isset($relatedData['achats']) ? min(count($relatedData['achats']) / 10, 5) : 0;
+        $score += isset($relatedData['bonuses']) ? min(count($relatedData['bonuses']) / 5, 5) : 0;
+
+        if ($score >= 15) {
+            return 'high';
+        } elseif ($score >= 8) {
+            return 'medium';
+        } else {
+            return 'low';
         }
     }
 
-    private function calculateMaxDepth(Collection $descendants): int
+    /**
+     * Génère un résumé de la validation
+     */
+    private function generateSummary($entity, array $blockers, array $warnings): string
     {
-        // Calcul simplifié de la profondeur maximale
-        return $descendants->map(function($desc) {
-            $depth = 0;
-            $current = $desc;
-            while ($current->parent && $depth < 20) { // Protection contre boucles infinies
-                $current = $current->parent;
-                $depth++;
-            }
-            return $depth;
-        })->max() ?? 0;
+        $summary = "";
+
+        if ($entity instanceof Distributeur) {
+            $summary = "Suppression du distributeur {$entity->full_name} (#{$entity->distributeur_id})";
+        } elseif ($entity instanceof Achat) {
+            $summary = "Suppression de l'achat #{$entity->id}";
+        }
+
+        if (count($blockers) > 0) {
+            $summary .= " - BLOQUÉE : " . count($blockers) . " problème(s) bloquant(s)";
+        } elseif (count($warnings) > 0) {
+            $summary .= " - ATTENTION : " . count($warnings) . " avertissement(s)";
+        } else {
+            $summary .= " - Suppression simple sans impact majeur";
+        }
+
+        return $summary;
     }
 }
