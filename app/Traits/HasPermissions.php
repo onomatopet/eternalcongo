@@ -10,8 +10,6 @@ trait HasPermissions
     public function hasPermission(string $permission): bool
     {
         // Pour l'instant, un système simple basé sur les rôles
-        // Vous pouvez l'étendre avec un système de permissions plus complexe
-
         $adminPermissions = [
             'access_admin',
             'view_distributeurs',
@@ -45,12 +43,12 @@ trait HasPermissions
             'manage_all_deletion_requests',
         ]);
 
-        // Vérification basée sur le rôle ou un champ dans la table users
-        if ($this->hasRole('super_admin') || $this->is_super_admin) {
+        // Vérification basée sur le rôle
+        if ($this->hasRole('super_admin')) {
             return in_array($permission, $superAdminPermissions);
         }
 
-        if ($this->hasRole('admin') || $this->is_admin) {
+        if ($this->hasRole('admin')) {
             return in_array($permission, $adminPermissions);
         }
 
