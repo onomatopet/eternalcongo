@@ -9,6 +9,7 @@ use App\Http\Controllers\Admin\ProductController;
 use App\Http\Controllers\Admin\BonusController;
 use App\Http\Controllers\Admin\DeletionRequestController;
 use App\Http\Controllers\Admin\ModificationRequestController;
+use App\Http\Controllers\Admin\AdminSnapshotController;
 use App\Models\DeletionRequest;
 use App\Models\Distributeur;
 use App\Services\DeletionValidationService;
@@ -124,6 +125,12 @@ Route::middleware(['auth', 'verified', 'check_admin_role'])
 
             // Routes utilitaires
             Route::get('/search/ajax', [ProductController::class, 'search'])->name('search');
+        });
+
+        // ===== SYSTÈME DE SNAPSHOTS =====
+        Route::prefix('snapshots')->name('snapshots.')->group(function () {
+            Route::get('/create', [AdminSnapshotController::class, 'create'])->name('create');
+            Route::post('/', [AdminSnapshotController::class, 'store'])->name('store');
         });
 
         // ===== GESTION DES BONUS =====
