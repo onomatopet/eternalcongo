@@ -60,7 +60,7 @@ class AchatReturnController extends Controller
     /**
      * Affiche le formulaire de création d'une demande
      */
-    public function create(Achat $achat): View
+    public function create(Achat $achat): View|RedirectResponse
     {
         // Vérifier que l'achat peut être retourné
         if ($achat->status !== 'active') {
@@ -192,7 +192,7 @@ class AchatReturnController extends Controller
             // Exécuter immédiatement si demandé
             if ($request->boolean('execute_immediately')) {
                 $result = $this->validationService->executeReturn($returnRequest);
-
+                
                 if (!$result['success']) {
                     throw new \Exception($result['error']);
                 }
@@ -255,7 +255,7 @@ class AchatReturnController extends Controller
         DB::beginTransaction();
         try {
             $result = $this->validationService->executeReturn($returnRequest);
-
+            
             if (!$result['success']) {
                 throw new \Exception($result['error']);
             }
@@ -312,17 +312,17 @@ class AchatReturnController extends Controller
             'total_returns' => AchatReturnRequest::whereHas('achat', fn($q) => $q->where('period', $period))
                                                 ->where('status', AchatReturnRequest::STATUS_COMPLETED)
                                                 ->count(),
-
+            
             'total_amount_refunded' => AchatReturnRequest::whereHas('achat', fn($q) => $q->where('period', $period))
                                                         ->where('status', AchatReturnRequest::STATUS_COMPLETED)
                                                         ->sum('amount_to_refund'),
-
+            
             'by_type' => AchatReturnRequest::whereHas('achat', fn($q) => $q->where('period', $period))
                                           ->where('status', AchatReturnRequest::STATUS_COMPLETED)
                                           ->selectRaw('type, count(*) as count, sum(amount_to_refund) as total')
                                           ->groupBy('type')
                                           ->get(),
-
+            
             'by_reason' => AchatReturnRequest::whereHas('achat', fn($q) => $q->where('period', $period))
                                             ->where('status', AchatReturnRequest::STATUS_COMPLETED)
                                             ->selectRaw('reason, count(*) as count')
@@ -335,18 +335,3 @@ class AchatReturnController extends Controller
         return view('admin.achat-returns.report', compact('stats', 'period'));
     }
 }
-
-// Routes à ajouter dans routes/web.php dans la section admin
-/*
-Route::prefix('achat-returns')->name('achat-returns.')->group(function () {
-    Route::get('/', [AchatReturnController::class, 'index'])->name('index');
-    Route::get('/create/{achat}', [AchatReturnController::class, 'create'])->name('create');
-    Route::post('/{achat}', [AchatReturnController::class, 'store'])->name('store');
-    Route::get('/{returnRequest}', [AchatReturnController::class, 'show'])->name('show');
-    Route::post('/{returnRequest}/approve', [AchatReturnController::class, 'approve'])->name('approve');
-    Route::post('/{returnRequest}/reject', [AchatReturnController::class, 'reject'])->name('reject');
-    Route::post('/{returnRequest}/execute', [AchatReturnController::class, 'execute'])->name('execute');
-    Route::delete('/{returnRequest}/cancel', [AchatReturnController::class, 'cancel'])->name('cancel');
-    Route::get('/report/period', [AchatReturnController::class, 'report'])->name('report');
-});
-*/

@@ -13,7 +13,7 @@ class AchatReturnValidationService
     /**
      * Valide si un achat peut être annulé/retourné
      */
-    public function validateReturnRequest(Achat $achat, string $type, int $quantityToReturn = null): array
+    public function validateReturnRequest(Achat $achat, string $type, ?int $quantityToReturn = null): array
     {
         $result = [
             'can_proceed' => true,

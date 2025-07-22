@@ -11,6 +11,7 @@ use App\Http\Controllers\Admin\AchatReturnController;
 use App\Models\DeletionRequest;
 use App\Models\Distributeur;
 use App\Services\DeletionValidationService;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Http\Request;
 
@@ -28,8 +29,7 @@ Route::middleware('auth')->group(function () {
 
     // Dashboard principal (pour les utilisateurs connectés)
     Route::get('/dashboard', function () {
-        // Rediriger vers le dashboard admin si l'utilisateur a les permissions admin
-        if (auth()->user()->hasPermission('access_admin')) {
+        if (Auth::check() && Auth::user()->hasPermission('access_admin')) {
             return redirect()->route('admin.dashboard');
         }
         return view('dashboard');

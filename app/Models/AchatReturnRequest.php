@@ -109,7 +109,7 @@ class AchatReturnRequest extends Model
     /**
      * Actions
      */
-    public function approve(int $approverId, string $note = null): bool
+    public function approve(int $approverId, ?string $note = null): bool
     {
         if (!$this->canBeApproved()) {
             return false;
