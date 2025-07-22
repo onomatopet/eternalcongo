@@ -4,20 +4,30 @@ namespace App\Http\Middleware;
 
 use Closure;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
 use Symfony\Component\HttpFoundation\Response;
 
 class CheckAdminRole
 {
+    /**
+     * Handle an incoming request.
+     *
+     * @param  \Closure(\Illuminate\Http\Request): (\Symfony\Component\HttpFoundation\Response)  $next
+     */
     public function handle(Request $request, Closure $next): Response
     {
-        if (!Auth::check()) {
-            return redirect()->route('login')->with('error', 'Vous devez être connecté.');
+        // Vérifier que l'utilisateur est connecté
+        if (!auth()->check()) {
+            return redirect()->route('login');
         }
 
-        $user = Auth::user();
-        if (!$user->role_id || $user->role_id !== 1) {
-            return redirect()->route('dashboard')->with('error', 'Accès refusé. Vous devez être administrateur.');
+        // Vérifier que l'utilisateur a les permissions admin
+        if (!auth()->user()->hasPermission('access_admin')) {
+            abort(403, 'Accès non autorisé. Vous devez être administrateur pour accéder à cette section.');
+        }
+
+        // Mettre à jour la dernière connexion si l'utilisateur accède à l'admin
+        if (method_exists(auth()->user(), 'updateLastLogin')) {
+            auth()->user()->updateLastLogin();
         }
 
         return $next($request);
