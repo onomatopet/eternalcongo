@@ -280,7 +280,10 @@ Route::middleware(['auth', 'verified', 'check_admin_role'])
         // ===== GESTION DU RÉSEAU DISTRIBUTEUR =====
         Route::prefix('network')->name('network.')->group(function () {
             Route::get('/', [NetworkExportController::class, 'index'])->name('index');
-            Route::get('/search-distributeurs', [NetworkExportController::class, 'searchDistributeurs'])->name('search.distributeurs');
+
+            // AJOUTER CETTE ROUTE pour la recherche AJAX
+            Route::get('/search/distributeurs', [NetworkExportController::class, 'searchDistributeurs'])->name('search.distributeurs');
+
             Route::get('/export', [NetworkExportController::class, 'export'])->name('export');
             Route::post('/export-pdf', [NetworkExportController::class, 'exportPdf'])->name('export.pdf');
             Route::post('/export-excel', [NetworkExportController::class, 'exportExcel'])->name('export.excel');

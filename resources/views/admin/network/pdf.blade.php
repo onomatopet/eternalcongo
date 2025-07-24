@@ -1,161 +1,212 @@
-<!DOCTYPE html>
-<html lang="fr">
-<head>
-    <meta charset="UTF-8">
-    <title>Réseau {{ $mainDistributor->distributeur_id }} - {{ $period }}</title>
-    <style>
-        @page {
-            size: A4 landscape;
-            margin: 15mm;
-        }
+{{-- resources/views/layouts/network/pdf.blade.php --}}
+@extends('layouts.admin')
 
-        body {
-            font-family: 'DejaVu Sans', sans-serif;
-            font-size: 9pt;
-            line-height: 1.3;
-            color: #333;
-        }
+@section('title', 'Export Réseau - Structure Détaillée')
 
-        .header {
-            text-align: center;
-            margin-bottom: 20px;
-            padding-bottom: 10px;
-            border-bottom: 2px solid #000;
-        }
+@section('content')
+<div class="min-h-screen bg-gray-50 py-8">
+    <div class="px-4 sm:px-6 lg:px-8">
+        {{-- En-tête du rapport --}}
+        <div class="bg-white rounded-lg shadow-sm mb-6">
+            <div class="px-6 py-4 border-b border-gray-200">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h1 class="text-2xl font-bold text-gray-900">ETERNAL Details Network Structure</h1>
+                        <p class="text-sm text-gray-600 mt-1">eternalcongo.com - contact@eternalcongo.com</p>
+                        <p class="text-sm text-gray-500">Print time: {{ now()->format('d-m-Y') }}</p>
+                    </div>
+                    <div class="flex space-x-3">
+                        <button onclick="window.print()"
+                                class="inline-flex items-center px-4 py-2 bg-gray-600 text-white text-sm font-medium rounded-lg hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 transition-colors duration-200">
+                            <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/>
+                            </svg>
+                            Imprimer
+                        </button>
+                        <a href="{{ route('admin.network.export.pdf', request()->all()) }}"
+                           class="inline-flex items-center px-4 py-2 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-colors duration-200">
+                            <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                            </svg>
+                            Export PDF
+                        </a>
+                    </div>
+                </div>
 
-        h1 {
-            font-size: 18pt;
-            margin: 0 0 5px 0;
-            color: #000;
-        }
+                {{-- Informations sur le distributeur principal et la période --}}
+                @if(isset($distributeurs) && count($distributeurs) > 0)
+                    @php
+                        $distributeurPrincipal = collect($distributeurs)->firstWhere('rang', 0);
+                    @endphp
+                    @if($distributeurPrincipal)
+                        <div class="mt-4 bg-blue-50 border border-blue-200 rounded-lg p-4">
+                            <div class="flex items-center">
+                                <div class="flex-shrink-0">
+                                    <svg class="h-5 w-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
+                                    </svg>
+                                </div>
+                                <div class="ml-3">
+                                    <h3 class="text-lg font-medium text-blue-900">
+                                        {{ $distributeurPrincipal['nom_distributeur'] }} {{ $distributeurPrincipal['pnom_distributeur'] }}
+                                        ({{ $distributeurPrincipal['distributeur_id'] }})
+                                    </h3>
+                                    <p class="text-sm text-blue-700">
+                                        Période: {{ request('period', now()->format('Y-m')) }} |
+                                        Total réseau: {{ count($distributeurs) }} distributeurs
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    @endif
+                @endif
+            </div>
+        </div>
 
-        h2 {
-            font-size: 14pt;
-            margin: 0 0 5px 0;
-            color: #333;
-        }
+        {{-- Tableau de la structure du réseau --}}
+        <div class="bg-white shadow-lg rounded-lg overflow-hidden">
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                ID
+                            </th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Nom & Prénom
+                            </th>
+                            <th scope="col" class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Rang
+                            </th>
+                            <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                New PV
+                            </th>
+                            <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Total PV
+                            </th>
+                            <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Cumulative PV
+                            </th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                ID references
+                            </th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                References Name
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200">
+                        @forelse($distributeurs as $distributeur)
+                            <tr class="{{ $distributeur['rang'] == 0 ? 'bg-blue-50 font-semibold' : ($distributeur['rang'] == 1 ? 'bg-gray-50' : '') }}">
+                                {{-- ID (Matricule) --}}
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                    {{ $distributeur['distributeur_id'] }}
+                                </td>
 
-        .info {
-            font-size: 10pt;
-            color: #666;
-        }
+                                {{-- Nom & Prénom avec indentation selon le rang --}}
+                                <td class="px-6 py-4 whitespace-nowrap text-sm">
+                                    <div style="padding-left: {{ $distributeur['rang'] * 20 }}px">
+                                        <span class="{{ $distributeur['rang'] == 0 ? 'font-semibold text-blue-900' : 'text-gray-900' }}">
+                                            {{ $distributeur['nom_distributeur'] }} {{ $distributeur['pnom_distributeur'] }}
+                                        </span>
+                                    </div>
+                                </td>
 
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 10px;
-        }
+                                {{-- Rang --}}
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-center">
+                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium {{ $distributeur['rang'] == 0 ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-800' }}">
+                                        {{ $distributeur['rang'] }}
+                                    </span>
+                                </td>
 
-        th {
-            background-color: #f0f0f0;
-            font-weight: bold;
-            padding: 8px 5px;
-            text-align: left;
-            border: 1px solid #ddd;
-            font-size: 8pt;
-        }
+                                {{-- New PV --}}
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-right text-gray-900">
+                                    ${{ number_format($distributeur['new_cumul'] ?? 0, 0, '.', '') }}
+                                </td>
 
-        td {
-            padding: 6px 5px;
-            border: 1px solid #ddd;
-            font-size: 8pt;
-        }
+                                {{-- Total PV --}}
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-right text-gray-900">
+                                    ${{ number_format($distributeur['cumul_total'] ?? 0, 0, '.', '') }}
+                                </td>
 
-        tr:nth-child(even) {
-            background-color: #f9f9f9;
-        }
+                                {{-- Cumulative PV --}}
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-right font-medium text-gray-900">
+                                    ${{ number_format($distributeur['cumul_collectif'] ?? 0, 0, '.', '') }}
+                                </td>
 
-        .text-center {
-            text-align: center;
-        }
+                                {{-- ID references (Matricule parrain) --}}
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                    {{ $distributeur['id_distrib_parent'] ?: '-' }}
+                                </td>
 
-        .text-right {
-            text-align: right;
-        }
+                                {{-- References Name (Nom parrain) --}}
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                    @if($distributeur['id_distrib_parent'])
+                                        {{ $distributeur['nom_parent'] }} {{ $distributeur['pnom_parent'] }}
+                                    @else
+                                        -
+                                    @endif
+                                </td>
+                            </tr>
+                        @empty
+                            <tr>
+                                <td colspan="8" class="px-6 py-12 text-center">
+                                    <div class="flex flex-col items-center">
+                                        <svg class="h-12 w-12 text-gray-400 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                                        </svg>
+                                        <p class="text-gray-500">Aucune donnée disponible pour cette période</p>
+                                    </div>
+                                </td>
+                            </tr>
+                        @endforelse
+                    </tbody>
+                </table>
+            </div>
 
-        .grade {
-            display: inline-block;
-            padding: 2px 6px;
-            background-color: #fef3c7;
-            color: #92400e;
-            border-radius: 3px;
-            font-weight: bold;
-        }
-
-        .footer {
-            margin-top: 20px;
-            padding-top: 10px;
-            border-top: 1px solid #ddd;
-            text-align: center;
-            font-size: 8pt;
-            color: #666;
-        }
-
-        .level-indent {
-            display: inline-block;
-            width: 15px;
-        }
-    </style>
-</head>
-<body>
-    <div class="header">
-        <h1>{{ $mainDistributor->nom_distributeur }} {{ $mainDistributor->pnom_distributeur }}</h1>
-        <h2>({{ $mainDistributor->distributeur_id }})</h2>
-        <p class="info">
-            ETERNAL Details Network Structure - Période : {{ $period }}<br>
-            Total : {{ $totalCount }} distributeur(s) | Date : {{ $printDate }}
-        </p>
+            {{-- Résumé en bas de tableau --}}
+            @if(isset($distributeurs) && count($distributeurs) > 0)
+                <div class="bg-gray-50 px-6 py-4 border-t border-gray-200">
+                    <div class="flex justify-between items-center">
+                        <div class="text-sm text-gray-600">
+                            <span class="font-medium">Total distributeurs:</span> {{ count($distributeurs) }}
+                        </div>
+                        <div class="text-sm text-gray-600">
+                            <span class="font-medium">Total PV cumulés:</span>
+                            ${{ number_format(collect($distributeurs)->sum('cumul_collectif'), 0, '.', ' ') }}
+                        </div>
+                    </div>
+                </div>
+            @endif
+        </div>
     </div>
+</div>
 
-    <table>
-        <thead>
-            <tr>
-                <th width="8%">ID</th>
-                <th width="5%">Niv.</th>
-                <th width="20%">Nom & Prénom</th>
-                <th width="5%" class="text-center">Grade</th>
-                <th width="8%" class="text-right">New PV</th>
-                <th width="8%" class="text-right">Total PV</th>
-                <th width="10%" class="text-right">Cumul PV</th>
-                <th width="8%" class="text-center">ID Parent</th>
-                <th width="20%">Nom Parent</th>
-            </tr>
-        </thead>
-        <tbody>
-            @foreach($distributeurs as $distributeur)
-                <tr>
-                    <td>{{ $distributeur['distributeur_id'] }}</td>
-                    <td>
-                        @for($i = 0; $i < $distributeur['rang']; $i++)
-                            <span class="level-indent">—</span>
-                        @endfor
-                        {{ $distributeur['rang'] }}
-                    </td>
-                    <td>{{ $distributeur['nom_distributeur'] }} {{ $distributeur['pnom_distributeur'] }}</td>
-                    <td class="text-center">
-                        <span class="grade">{{ $distributeur['etoiles'] }} ★</span>
-                    </td>
-                    <td class="text-right">{{ number_format($distributeur['new_cumul'], 0, ',', ' ') }}</td>
-                    <td class="text-right">{{ number_format($distributeur['cumul_total'], 0, ',', ' ') }}</td>
-                    <td class="text-right"><strong>{{ number_format($distributeur['cumul_collectif'], 0, ',', ' ') }}</strong></td>
-                    <td class="text-center">{{ $distributeur['id_distrib_parent'] ?: '-' }}</td>
-                    <td>
-                        @if($distributeur['id_distrib_parent'])
-                            {{ $distributeur['nom_parent'] }} {{ $distributeur['pnom_parent'] }}
-                        @else
-                            -
-                        @endif
-                    </td>
-                </tr>
-            @endforeach
-        </tbody>
-    </table>
+{{-- Styles d'impression --}}
+@push('styles')
+<style media="print">
+    @page {
+        size: A4 landscape;
+        margin: 10mm;
+    }
 
-    <div class="footer">
-        <p>
-            eternalcongo.com - contact@eternalcongo.com<br>
-            Document généré automatiquement - {{ config('app.name') }}
-        </p>
-    </div>
-</body>
-</html>
+    body {
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+    }
+
+    .no-print {
+        display: none !important;
+    }
+
+    table {
+        font-size: 10pt;
+    }
+
+    th, td {
+        padding: 4px 8px !important;
+    }
+</style>
+@endpush
+
+@endsection
