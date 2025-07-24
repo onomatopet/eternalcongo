@@ -1,379 +1,449 @@
-{{-- resources/views/admin/achats/create.blade.php --}}
-
 @extends('layouts.admin')
 
-@section('title', 'Enregistrer un Achat')
+@section('title', 'Nouvel Achat')
 
 @section('content')
-<div class="min-h-screen bg-gray-50 py-8">
-    <div class="px-4 sm:px-6 lg:px-8">
-        {{-- En-tête avec fil d'Ariane --}}
-        <div class="bg-white rounded-lg shadow-sm px-6 py-4 mb-6">
-            <nav class="flex items-center text-sm">
-                <a href="{{ route('admin.dashboard') }}" class="text-gray-500 hover:text-gray-700 transition-colors duration-200">
-                    <svg class="w-4 h-4 mr-1 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/>
-                    </svg>
-                    Tableau de Bord
-                </a>
-                <span class="mx-2 text-gray-400">/</span>
-                <a href="{{ route('admin.achats.index') }}" class="text-gray-500 hover:text-gray-700 transition-colors duration-200">
-                    Achats
-                </a>
-                <span class="mx-2 text-gray-400">/</span>
-                <span class="text-gray-700 font-medium">Nouvel Achat</span>
-            </nav>
-        </div>
-
-        {{-- Titre principal --}}
-        <div class="mb-8">
-            <h1 class="text-3xl font-bold text-gray-900">Enregistrer un nouvel achat</h1>
-            <p class="mt-2 text-gray-600">Complétez le formulaire pour enregistrer un achat effectué par un distributeur.</p>
-        </div>
-
-        {{-- Messages de session --}}
-        @if(session('success'))
-            <div class="bg-green-50 border-l-4 border-green-400 p-4 mb-6 rounded-lg">
-                <div class="flex">
-                    <div class="flex-shrink-0">
-                        <svg class="h-5 w-5 text-green-400" fill="currentColor" viewBox="0 0 20 20">
-                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
-                        </svg>
-                    </div>
-                    <div class="ml-3">
-                        <p class="text-sm font-medium text-green-800">{{ session('success') }}</p>
-                    </div>
+<div class="container-fluid">
+    <div class="row justify-content-center">
+        <div class="col-md-10">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">Créer un nouvel achat</h3>
                 </div>
-            </div>
-        @endif
 
-        @if(session('error'))
-            <div class="bg-red-50 border-l-4 border-red-400 p-4 mb-6 rounded-lg">
-                <div class="flex">
-                    <div class="flex-shrink-0">
-                        <svg class="h-5 w-5 text-red-400" fill="currentColor" viewBox="0 0 20 20">
-                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"/>
-                        </svg>
-                    </div>
-                    <div class="ml-3">
-                        <p class="text-sm font-medium text-red-800">{{ session('error') }}</p>
-                    </div>
-                </div>
-            </div>
-        @endif
+                <form action="{{ route('admin.achats.store') }}" method="POST" id="achat-form">
+                    @csrf
 
-        {{-- Affichage des erreurs --}}
-        @if ($errors->any())
-            <div class="bg-red-50 border-l-4 border-red-400 p-4 mb-6 rounded-lg">
-                <div class="flex">
-                    <div class="flex-shrink-0">
-                        <svg class="h-5 w-5 text-red-400" fill="currentColor" viewBox="0 0 20 20">
-                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"/>
-                        </svg>
-                    </div>
-                    <div class="ml-3">
-                        <h3 class="text-sm font-medium text-red-800">Des erreurs ont été détectées :</h3>
-                        <div class="mt-2 text-sm text-red-700">
-                            <ul class="list-disc pl-5 space-y-1">
-                                @foreach ($errors->all() as $error)
-                                    <li>{{ $error }}</li>
-                                @endforeach
-                            </ul>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        @endif
-
-        {{-- Formulaire principal --}}
-        <form method="POST" action="{{ route('admin.achats.store') }}" class="space-y-8">
-            @csrf
-
-            {{-- Sections côte à côte sur grand écran --}}
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {{-- Section Informations de base --}}
-                <div class="bg-white shadow-lg rounded-lg overflow-hidden h-fit">
-                    <div class="bg-gradient-to-r from-green-500 to-green-600 px-6 py-4">
-                        <h2 class="text-xl font-semibold text-white flex items-center">
-                            <svg class="w-6 h-6 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                            </svg>
-                            Informations de base
-                        </h2>
-                    </div>
-                    <div class="p-6 space-y-6">
-                        {{-- Période --}}
-                        <div>
-                            <label for="period" class="block text-sm font-medium text-gray-700 mb-2">
-                                Période <span class="text-red-500">*</span>
-                            </label>
-                            <select
-                                name="period"
-                                id="period"
-                                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200 @error('period') border-red-500 @enderror"
-                                required>
-                                <option value="">Sélectionner une période</option>
-                                @foreach($periods as $periodValue => $periodLabel)
-                                    <option value="{{ $periodValue }}" {{ old('period') == $periodValue ? 'selected' : '' }}>
-                                        {{ $periodLabel }}
-                                    </option>
-                                @endforeach
-                            </select>
-                            @error('period')
-                                <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
-                            @enderror
-                            <p class="mt-1 text-xs text-gray-500">Format: YYYY-MM (ex: 2025-07)</p>
-                        </div>
-
-                        {{-- Recherche distributeur --}}
-                        <div>
-                            <label for="distributeur_search" class="block text-sm font-medium text-gray-700 mb-2">
-                                Distributeur <span class="text-red-500">*</span>
-                            </label>
-                            <div class="relative">
-                                <input
-                                    type="text"
-                                    id="distributeur_search"
-                                    placeholder="Rechercher par nom, prénom ou matricule..."
-                                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200"
-                                    autocomplete="off">
-                                <input type="hidden" name="distributeur_id" id="distributeur_id" value="{{ old('distributeur_id') }}">
-
-                                {{-- Résultats de recherche --}}
-                                <div id="search_results" class="hidden absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
-                                    {{-- Les résultats seront injectés ici via JavaScript --}}
-                                </div>
+                    <div class="card-body">
+                        {{-- Messages d'erreur globaux --}}
+                        @if ($errors->any())
+                            <div class="alert alert-danger mb-4">
+                                <ul class="mb-0">
+                                    @foreach ($errors->all() as $error)
+                                        <li>{{ $error }}</li>
+                                    @endforeach
+                                </ul>
                             </div>
-                            @error('distributeur_id')
-                                <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
-                            @enderror
-                        </div>
+                        @endif
 
-                        {{-- Achat en ligne --}}
-                        <div>
-                            <div class="flex items-center">
-                                <input
-                                    type="checkbox"
-                                    name="online"
-                                    id="online"
-                                    value="1"
-                                    {{ old('online') ? 'checked' : '' }}
-                                    class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
-                                <label for="online" class="ml-2 block text-sm text-gray-900">
-                                    Achat effectué en ligne
+                        {{-- Section 1: Sélection du distributeur --}}
+                        <div class="mb-4">
+                            <h5 class="mb-3">1. Sélection du distributeur</h5>
+
+                            <div class="form-group">
+                                <label class="form-label">
+                                    Distributeur <span class="text-danger">*</span>
                                 </label>
-                            </div>
-                            <p class="mt-1 text-xs text-gray-500">Cochez si l'achat a été effectué via la plateforme en ligne</p>
-                        </div>
-                    </div>
-                </div>
 
-                {{-- Section Produit et calculs --}}
-                <div class="bg-white shadow-lg rounded-lg overflow-hidden h-fit">
-                    <div class="bg-gradient-to-r from-blue-500 to-blue-600 px-6 py-4">
-                        <h2 class="text-xl font-semibold text-white flex items-center">
-                            <svg class="w-6 h-6 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z"/>
-                            </svg>
-                            Produit et quantité
-                        </h2>
-                    </div>
-                    <div class="p-6 space-y-6">
-                        {{-- Sélection produit --}}
-                        <div>
-                            <label for="products_id" class="block text-sm font-medium text-gray-700 mb-2">
-                                Produit <span class="text-red-500">*</span>
-                            </label>
-                            <select
-                                name="products_id"
-                                id="products_id"
-                                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200 @error('products_id') border-red-500 @enderror"
-                                required>
-                                <option value="">Sélectionner un produit</option>
-                                @foreach($products as $product)
-                                    <option value="{{ $product['id'] }}"
-                                            data-price="{{ $product['price'] }}"
-                                            data-points="{{ $product['points'] }}"
-                                            {{ old('products_id') == $product['id'] ? 'selected' : '' }}>
-                                        {{ $product['name'] }} - {{ number_format($product['price'], 0, ',', ' ') }} FCFA ({{ $product['points'] }} PV)
-                                    </option>
-                                @endforeach
-                            </select>
-                            @error('products_id')
-                                <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
-                            @enderror
-                        </div>
+                                {{-- Champ de recherche --}}
+                                <div class="position-relative">
+                                    <input
+                                        type="text"
+                                        id="distributeur-search"
+                                        class="form-control"
+                                        placeholder="Rechercher par nom, prénom, matricule ou téléphone..."
+                                        autocomplete="off"
+                                    >
 
-                        {{-- Quantité --}}
-                        <div>
-                            <label for="qt" class="block text-sm font-medium text-gray-700 mb-2">
-                                Quantité <span class="text-red-500">*</span>
-                            </label>
-                            <input
-                                type="number"
-                                name="qt"
-                                id="qt"
-                                min="1"
-                                value="{{ old('qt', 1) }}"
-                                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200 @error('qt') border-red-500 @enderror"
-                                required>
-                            @error('qt')
-                                <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
-                            @enderror
-                        </div>
-
-                        {{-- Aperçu des calculs --}}
-                        <div class="bg-gray-50 rounded-lg p-4">
-                            <h3 class="text-sm font-medium text-gray-900 mb-3">Aperçu des calculs</h3>
-                            <div class="space-y-2 text-sm">
-                                <div class="flex justify-between">
-                                    <span class="text-gray-600">Prix unitaire :</span>
-                                    <span class="font-medium" id="preview_price">0 FCFA</span>
-                                </div>
-                                <div class="flex justify-between">
-                                    <span class="text-gray-600">Points par unité :</span>
-                                    <span class="font-medium text-blue-600" id="preview_points_unit">0 PV</span>
-                                </div>
-                                <div class="border-t pt-2 mt-2">
-                                    <div class="flex justify-between">
-                                        <span class="text-gray-600">Total points :</span>
-                                        <span class="font-medium text-blue-600" id="preview_points">0 PV</span>
-                                    </div>
-                                    <div class="flex justify-between">
-                                        <span class="text-gray-600">Montant total :</span>
-                                        <span class="font-semibold text-green-600 text-lg" id="preview_total">0 FCFA</span>
+                                    {{-- Résultats de recherche --}}
+                                    <div id="search-results" class="hidden position-absolute w-100 mt-1 bg-white rounded shadow-lg" style="max-height: 300px; overflow-y: auto; z-index: 1000; display: none;">
+                                        <!-- Les résultats seront affichés ici -->
                                     </div>
                                 </div>
+
+                                {{-- Distributeur sélectionné --}}
+                                <div id="selected-distributeur" class="mt-2" style="display: none;">
+                                    <!-- Le distributeur sélectionné sera affiché ici -->
+                                </div>
+
+                                {{-- Input caché pour l'ID du distributeur --}}
+                                <input type="hidden" name="distributeur_id" id="distributeur_id" value="{{ old('distributeur_id') }}" required>
+
+                                @error('distributeur_id')
+                                    <div class="invalid-feedback d-block">{{ $message }}</div>
+                                @enderror
+                            </div>
+                        </div>
+
+                        <hr class="my-4">
+
+                        {{-- Section 2: Détails du produit --}}
+                        <div class="mb-4">
+                            <h5 class="mb-3">2. Détails du produit</h5>
+
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="form-group">
+                                        <label for="products_id" class="form-label">
+                                            Produit <span class="text-danger">*</span>
+                                        </label>
+                                        <select name="products_id" id="products_id" class="form-control @error('products_id') is-invalid @enderror" required>
+                                            <option value="">-- Sélectionner un produit --</option>
+                                            @if(isset($products))
+                                                @foreach($products as $product)
+                                                    @php
+                                                        // Initialiser les variables
+                                                        $id = null;
+                                                        $nom = 'Produit';
+                                                        $prix = 0;
+                                                        $pv = 0;
+
+                                                        // Si c'est un objet
+                                                        if(is_object($product)) {
+                                                            $id = $product->id ?? null;
+                                                            $nom = $product->nom_produit ?? 'Produit';
+                                                            $prix = $product->prix_product ?? 0;
+                                                            // Gérer la relation pointvaleur
+                                                            if(isset($product->pointvaleur) && is_object($product->pointvaleur)) {
+                                                                $pv = $product->pointvaleur->numbers ?? 0;
+                                                            }
+                                                        }
+                                                        // Si c'est un tableau
+                                                        elseif(is_array($product)) {
+                                                            $id = $product['id'] ?? null;
+                                                            $nom = $product['nom_produit'] ?? 'Produit';
+                                                            $prix = $product['prix_product'] ?? 0;
+                                                            // Gérer pointvaleur dans un tableau
+                                                            if(isset($product['pointvaleur'])) {
+                                                                if(is_array($product['pointvaleur'])) {
+                                                                    $pv = $product['pointvaleur']['numbers'] ?? 0;
+                                                                } elseif(is_numeric($product['pointvaleur'])) {
+                                                                    $pv = $product['pointvaleur'];
+                                                                }
+                                                            }
+                                                        }
+                                                    @endphp
+
+                                                    @if($id)
+                                                        <option value="{{ $id }}"
+                                                            data-price="{{ $prix }}"
+                                                            data-pv="{{ $pv }}"
+                                                            {{ old('products_id') == $id ? 'selected' : '' }}>
+                                                            {{ $nom }} - {{ number_format($prix, 0, ',', ' ') }} FCFA
+                                                        </option>
+                                                    @endif
+                                                @endforeach
+                                            @endif
+                                        </select>
+                                        @error('products_id')
+                                            <div class="invalid-feedback">{{ $message }}</div>
+                                        @enderror
+                                    </div>
+                                </div>
+
+                                <div class="col-md-3">
+                                    <div class="form-group">
+                                        <label for="qt" class="form-label">
+                                            Quantité <span class="text-danger">*</span>
+                                        </label>
+                                        <input type="number"
+                                               name="qt"
+                                               id="qt"
+                                               class="form-control @error('qt') is-invalid @enderror"
+                                               value="{{ old('qt', 1) }}"
+                                               min="1"
+                                               required>
+                                        @error('qt')
+                                            <div class="invalid-feedback">{{ $message }}</div>
+                                        @enderror
+                                    </div>
+                                </div>
+
+                                <div class="col-md-3">
+                                    <div class="form-group">
+                                        <label for="period" class="form-label">
+                                            Période <span class="text-danger">*</span>
+                                        </label>
+                                        <input type="month"
+                                               name="period"
+                                               id="period"
+                                               class="form-control @error('period') is-invalid @enderror"
+                                               value="{{ old('period', date('Y-m')) }}"
+                                               required>
+                                        @error('period')
+                                            <div class="invalid-feedback">{{ $message }}</div>
+                                        @enderror
+                                    </div>
+                                </div>
+                            </div>
+
+                            {{-- Champs cachés pour compatibilité avec l'ancien système --}}
+                            <input type="hidden" name="online" value="off">
+
+                            {{-- Si votre ancien système utilise ces champs, décommentez-les --}}
+                            {{--
+                            <input type="hidden" name="value_pv" id="value_pv" value="">
+                            <input type="hidden" name="idproduit" id="idproduit" value="">
+                            <input type="hidden" name="value" id="value" value="">
+                            <input type="hidden" name="prix_product" id="prix_product" value="">
+                            <input type="hidden" name="pointvaleur_id" id="pointvaleur_id" value="">
+                            <input type="hidden" name="created_at" id="created_at" value="{{ date('d/m/Y') }}">
+                            --}}
+                        </div>
+
+                        <hr class="my-4">
+
+                        {{-- Section 3: Récapitulatif --}}
+                        <div class="mb-4">
+                            <h5 class="mb-3">3. Récapitulatif</h5>
+
+                            <div class="bg-light p-3 rounded">
+                                <div class="row">
+                                    <div class="col-md-4">
+                                        <p class="mb-1"><strong>Prix unitaire:</strong></p>
+                                        <p class="h5 mb-0"><span id="prix-unitaire">0</span> FCFA</p>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <p class="mb-1"><strong>Montant total:</strong></p>
+                                        <p class="h5 mb-0 text-primary"><span id="montant-total">0</span> FCFA</p>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <p class="mb-1"><strong>Points valeur (PV):</strong></p>
+                                        <p class="h5 mb-0 text-success"><span id="pv-total">0</span> PV</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {{-- Section 4: Informations complémentaires (si nécessaire) --}}
+                        <div class="mb-4">
+                            <div class="form-group">
+                                <label for="notes" class="form-label">Notes (optionnel)</label>
+                                <textarea name="notes" id="notes" class="form-control" rows="3">{{ old('notes') }}</textarea>
                             </div>
                         </div>
                     </div>
-                </div>
-            </div>
 
-            {{-- Boutons d'action --}}
-            <div class="flex items-center justify-end space-x-4 pt-6 border-t border-gray-200">
-                <a href="{{ route('admin.achats.index') }}" class="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors duration-200">
-                    Annuler
-                </a>
-                <button type="submit" class="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition-colors duration-200 flex items-center">
-                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
-                    </svg>
-                    Enregistrer l'achat
-                </button>
+                    <div class="card-footer">
+                        <div class="d-flex justify-content-between">
+                            <a href="{{ route('admin.achats.index') }}" class="btn btn-secondary">
+                                <i class="fas fa-arrow-left"></i> Retour
+                            </a>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-save"></i> Enregistrer l'achat
+                            </button>
+                        </div>
+                    </div>
+                </form>
             </div>
-        </form>
+        </div>
     </div>
 </div>
 
-{{-- Scripts pour la recherche de distributeur et calculs --}}
+{{-- Meta CSRF Token --}}
+<meta name="csrf-token" content="{{ csrf_token() }}">
+@endsection
+
 @push('scripts')
 <script>
-    // Recherche de distributeur
-    let searchTimeout;
-    const searchInput = document.getElementById('distributeur_search');
-    const searchResults = document.getElementById('search_results');
+document.addEventListener('DOMContentLoaded', function() {
+    // Éléments du DOM
+    const searchInput = document.getElementById('distributeur-search');
+    const searchResults = document.getElementById('search-results');
+    const selectedDistributeur = document.getElementById('selected-distributeur');
     const distributeurIdInput = document.getElementById('distributeur_id');
+    const productSelect = document.getElementById('products_id');
+    const quantiteInput = document.getElementById('qt');
+    let searchTimeout;
 
-    searchInput.addEventListener('input', function() {
-        clearTimeout(searchTimeout);
-        const query = this.value.trim();
+    // === GESTION DE LA RECHERCHE DE DISTRIBUTEUR ===
+    if (searchInput) {
+        searchInput.addEventListener('input', function(e) {
+            clearTimeout(searchTimeout);
+            const query = e.target.value.trim();
 
-        if (query.length < 2) {
-            searchResults.classList.add('hidden');
-            searchResults.innerHTML = '';
+            if (query.length < 2) {
+                searchResults.style.display = 'none';
+                return;
+            }
+
+            // Afficher un loader
+            searchResults.innerHTML = `
+                <div class="p-3 text-center">
+                    <div class="spinner-border spinner-border-sm text-primary" role="status">
+                        <span class="sr-only">Recherche...</span>
+                    </div>
+                    <p class="mb-0 mt-2 small text-muted">Recherche en cours...</p>
+                </div>
+            `;
+            searchResults.style.display = 'block';
+
+            searchTimeout = setTimeout(() => {
+                fetch(`{{ route('admin.distributeurs.search') }}?q=${encodeURIComponent(query)}`, {
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
+                    }
+                })
+                .then(response => {
+                    if (!response.ok) throw new Error('Erreur réseau');
+                    return response.json();
+                })
+                .then(data => {
+                    searchResults.innerHTML = '';
+
+                    const results = data.results || data;
+
+                    if (!results || results.length === 0) {
+                        searchResults.innerHTML = '<div class="p-3 text-muted">Aucun distributeur trouvé</div>';
+                    } else {
+                        results.forEach(distributeur => {
+                            const div = document.createElement('div');
+                            div.className = 'p-3 border-bottom cursor-pointer hover-bg-light';
+                            div.style.cursor = 'pointer';
+
+                            const displayText = distributeur.text || `#${distributeur.distributeur_id} - ${distributeur.pnom_distributeur} ${distributeur.nom_distributeur}`;
+
+                            div.innerHTML = `
+                                <div class="font-weight-bold">${displayText}</div>
+                                ${distributeur.tel_distributeur ? `<small class="text-muted">Tél: ${distributeur.tel_distributeur}</small>` : ''}
+                            `;
+
+                            div.addEventListener('click', function() {
+                                selectDistributeur(distributeur);
+                            });
+
+                            div.addEventListener('mouseenter', function() {
+                                this.style.backgroundColor = '#f8f9fa';
+                            });
+
+                            div.addEventListener('mouseleave', function() {
+                                this.style.backgroundColor = '';
+                            });
+
+                            searchResults.appendChild(div);
+                        });
+                    }
+                })
+                .catch(error => {
+                    console.error('Erreur:', error);
+                    searchResults.innerHTML = `
+                        <div class="p-3 text-danger">
+                            <i class="fas fa-exclamation-triangle"></i> Erreur lors de la recherche
+                        </div>
+                    `;
+                });
+            }, 300);
+        });
+    }
+
+    // Fonction pour sélectionner un distributeur
+    function selectDistributeur(distributeur) {
+        // Utiliser distributeur_id au lieu de id pour le champ hidden
+        distributeurIdInput.value = distributeur.distributeur_id || distributeur.id;
+        searchInput.value = '';
+        searchResults.style.display = 'none';
+
+        const displayText = distributeur.text || `#${distributeur.distributeur_id} - ${distributeur.pnom_distributeur} ${distributeur.nom_distributeur}`;
+
+        selectedDistributeur.innerHTML = `
+            <div class="alert alert-info d-flex justify-content-between align-items-center">
+                <div>
+                    <strong>Distributeur sélectionné:</strong><br>
+                    ${displayText}
+                    ${distributeur.tel_distributeur ? `<br><small>Tél: ${distributeur.tel_distributeur}</small>` : ''}
+                </div>
+                <button type="button" class="btn btn-sm btn-outline-info" onclick="clearDistributeur()">
+                    <i class="fas fa-times"></i> Changer
+                </button>
+            </div>
+        `;
+        selectedDistributeur.style.display = 'block';
+    }
+
+    // Fonction pour effacer la sélection
+    window.clearDistributeur = function() {
+        distributeurIdInput.value = '';
+        selectedDistributeur.innerHTML = '';
+        selectedDistributeur.style.display = 'none';
+        searchInput.value = '';
+    };
+
+    // Fermer les résultats si on clique ailleurs
+    document.addEventListener('click', function(e) {
+        if (!searchInput.contains(e.target) && !searchResults.contains(e.target)) {
+            searchResults.style.display = 'none';
+        }
+    });
+
+    // === CALCUL DU MONTANT TOTAL ET PV ===
+    function updateTotals() {
+        if (!productSelect || !quantiteInput) return;
+
+        const selectedOption = productSelect.options[productSelect.selectedIndex];
+        if (!selectedOption || selectedOption.value === '') {
+            document.getElementById('prix-unitaire').textContent = '0';
+            document.getElementById('montant-total').textContent = '0';
+            document.getElementById('pv-total').textContent = '0';
             return;
         }
 
-        // Afficher un loader
-        searchResults.innerHTML = `
-            <div class="p-4 text-center">
-                <svg class="animate-spin h-5 w-5 mx-auto text-gray-500" fill="none" viewBox="0 0 24 24">
-                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
-                <p class="mt-2 text-sm text-gray-500">Recherche en cours...</p>
-            </div>
-        `;
-        searchResults.classList.remove('hidden');
+        const prix = parseFloat(selectedOption.getAttribute('data-price')) || 0;
+        const pv = parseFloat(selectedOption.getAttribute('data-pv')) || 0;
+        const quantite = parseInt(quantiteInput.value) || 0;
 
-        searchTimeout = setTimeout(() => {
-            fetch(`{{ route('admin.distributeurs.search') }}?q=${encodeURIComponent(query)}`)
-            .then(response => response.json())
-            .then(data => {
-                searchResults.innerHTML = '';
-                if (data.length === 0) {
-                    searchResults.innerHTML = '<div class="p-3 text-sm text-gray-500">Aucun distributeur trouvé</div>';
-                } else {
-                    data.forEach(distributeur => {
-                        const div = document.createElement('div');
-                        div.className = 'p-3 hover:bg-gray-50 cursor-pointer border-b border-gray-100 last:border-b-0';
-                        div.innerHTML = `
-                            <div class="text-sm font-medium text-gray-900">${distributeur.distributeur_id} - ${distributeur.pnom_distributeur} ${distributeur.nom_distributeur}</div>
-                            ${distributeur.tel_distributeur ? `<div class="text-xs text-gray-500">${distributeur.tel_distributeur}</div>` : ''}
-                        `;
-                        div.addEventListener('click', () => selectDistributeur(distributeur));
-                        searchResults.appendChild(div);
-                    });
-                }
-                searchResults.classList.remove('hidden');
-            })
-            .catch(error => {
-                console.error('Erreur lors de la recherche:', error);
-                searchResults.innerHTML = '<div class="p-3 text-sm text-red-500">Erreur lors de la recherche</div>';
-                searchResults.classList.remove('hidden');
-            });
-        }, 300);
-    });
+        const montantTotal = prix * quantite;
+        const pvTotal = pv * quantite;
 
-    function selectDistributeur(distributeur) {
-        distributeurIdInput.value = distributeur.id;
-        searchInput.value = `${distributeur.distributeur_id} - ${distributeur.pnom_distributeur} ${distributeur.nom_distributeur}`;
-        searchResults.classList.add('hidden');
+        document.getElementById('prix-unitaire').textContent = prix.toLocaleString('fr-FR');
+        document.getElementById('montant-total').textContent = montantTotal.toLocaleString('fr-FR');
+        document.getElementById('pv-total').textContent = pvTotal.toLocaleString('fr-FR');
+
+        // Mettre à jour les champs cachés si ils existent (pour compatibilité)
+        const valuePvInput = document.getElementById('value_pv');
+        const idproduitInput = document.getElementById('idproduit');
+        const valueInput = document.getElementById('value');
+        const prixProductInput = document.getElementById('prix_product');
+
+        if (valuePvInput) valuePvInput.value = pvTotal;
+        if (idproduitInput) idproduitInput.value = selectedOption.value;
+        if (valueInput) valueInput.value = montantTotal;
+        if (prixProductInput) prixProductInput.value = prix;
     }
 
-    // Fermer les résultats quand on clique ailleurs
-    document.addEventListener('click', function(e) {
-        if (!searchInput.contains(e.target) && !searchResults.contains(e.target)) {
-            searchResults.classList.add('hidden');
-        }
-    });
-
-    // Calcul automatique
-    const productSelect = document.getElementById('products_id');
-    const quantityInput = document.getElementById('qt');
-    const previewPrice = document.getElementById('preview_price');
-    const previewPointsUnit = document.getElementById('preview_points_unit');
-    const previewTotal = document.getElementById('preview_total');
-    const previewPoints = document.getElementById('preview_points');
-
-    function updateCalculation() {
-        const selectedOption = productSelect.options[productSelect.selectedIndex];
-        const quantity = parseInt(quantityInput.value) || 0;
-
-        if (selectedOption && selectedOption.value) {
-            const price = parseFloat(selectedOption.dataset.price) || 0;
-            const points = parseInt(selectedOption.dataset.points) || 0;
-            const total = price * quantity;
-            const totalPoints = points * quantity;
-
-            previewPrice.textContent = new Intl.NumberFormat('fr-FR').format(price) + ' FCFA';
-            previewPointsUnit.textContent = points + ' PV';
-            previewTotal.textContent = new Intl.NumberFormat('fr-FR').format(total) + ' FCFA';
-            previewPoints.textContent = totalPoints + ' PV';
-        } else {
-            previewPrice.textContent = '0 FCFA';
-            previewPointsUnit.textContent = '0 PV';
-            previewTotal.textContent = '0 FCFA';
-            previewPoints.textContent = '0 PV';
-        }
+    // Écouteurs d'événements pour le calcul
+    if (productSelect) {
+        productSelect.addEventListener('change', updateTotals);
     }
 
-    productSelect.addEventListener('change', updateCalculation);
-    quantityInput.addEventListener('input', updateCalculation);
+    if (quantiteInput) {
+        quantiteInput.addEventListener('input', updateTotals);
+    }
 
-    // Calcul initial si des valeurs sont déjà sélectionnées
-    updateCalculation();
+    // Calcul initial
+    updateTotals();
+
+    // === VALIDATION DU FORMULAIRE ===
+    const form = document.getElementById('achat-form');
+    if (form) {
+        form.addEventListener('submit', function(e) {
+            if (!distributeurIdInput.value) {
+                e.preventDefault();
+                alert('Veuillez sélectionner un distributeur');
+                searchInput.focus();
+                return false;
+            }
+
+            if (!productSelect.value) {
+                e.preventDefault();
+                alert('Veuillez sélectionner un produit');
+                productSelect.focus();
+                return false;
+            }
+        });
+    }
+});
 </script>
 @endpush
-@endsection
+
+@push('styles')
+<style>
+    .cursor-pointer {
+        cursor: pointer;
+    }
+    .hover-bg-light:hover {
+        background-color: #f8f9fa;
+    }
+</style>
+@endpush

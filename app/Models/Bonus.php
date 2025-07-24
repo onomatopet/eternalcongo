@@ -37,21 +37,32 @@ class Bonus extends Model
         'bonus_direct',
         'bonus_indirect',
         'bonus_leadership',
-        'bonus',
+        'montant', // Changé de 'bonus' à 'montant'
         'epargne',
     ];
 
     protected $casts = [
-        'id' => 'integer',
         'distributeur_id' => 'integer',
         'bonus_direct' => 'decimal:2',
         'bonus_indirect' => 'decimal:2',
         'bonus_leadership' => 'decimal:2',
-        'bonus' => 'decimal:2', // Le total
+        'montant' => 'decimal:2', // Changé de 'bonus' à 'montant'
         'epargne' => 'decimal:2',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
     ];
+
+    // Si vous avez des accesseurs/mutateurs, mettez-les à jour aussi
+    public function getMontantFormattedAttribute()
+    {
+        return number_format($this->montant, 2, ',', ' ') . ' FCFA';
+    }
+
+    // Si vous aviez un accessor pour 'bonus', renommez-le
+    public function getBonusTotalAttribute()
+    {
+        return $this->bonus_direct + $this->bonus_indirect + $this->bonus_leadership;
+    }
 
     /**
      * Relation: Cet enregistrement de Bonus appartient à un Distributeur.

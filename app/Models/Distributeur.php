@@ -18,27 +18,27 @@ class Distributeur extends Model // Ou extends Authenticatable
     public $timestamps = true;
 
     protected $fillable = [
-        'etoiles_id',
-        'rang',
-        'distributeur_id', // Matricule
-        'nom_distributeur',
-        'pnom_distributeur',
-        'tel_distributeur',
-        'adress_distributeur',
-        'id_distrib_parent',
-        'statut_validation_periode', // Nom de la colonne après modification
-    ];
+    'distributeur_id',
+    'nom_distributeur',
+    'pnom_distributeur',
+    'tel_distributeur',
+    'adress_distributeur',
+    'id_distrib_parent',
+    'etoiles_id',
+    'rang',
+    'statut_validation_periode', // Ajoutez cette ligne
+    'is_indivual_cumul_checked',
+];
 
-    protected $casts = [
-        'id' => 'integer',
-        'etoiles_id' => 'integer', // Ou smallInteger si changé
-        'rang' => 'integer',
-        'distributeur_id' => 'string', // Matricule peut contenir lettres/chiffres? Mettre string est plus sûr. Si c'est TOUJOURS un nombre, garder 'integer'.
-        'id_distrib_parent' => 'integer',
-        'statut_validation_periode' => 'boolean',
-        'created_at' => 'datetime',
-        'updated_at' => 'datetime',
-    ];
+protected $casts = [
+    'etoiles_id' => 'integer',
+    'rang' => 'integer',
+    'id_distrib_parent' => 'integer',
+    'statut_validation_periode' => 'boolean', // Ajoutez cette ligne
+    'is_indivual_cumul_checked' => 'boolean',
+    'created_at' => 'datetime',
+    'updated_at' => 'datetime',
+];
 
     // Si les distributeurs se connectent, ajouter :
     // protected $hidden = ['password', 'remember_token'];

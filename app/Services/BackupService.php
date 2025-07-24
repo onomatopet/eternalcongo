@@ -156,40 +156,57 @@ class BackupService
     /**
      * Liste les backups disponibles
      */
-    public function listBackups(array $filters = []): \Illuminate\Support\Collection
-    {
-        $query = DB::table('deletion_backups');
+    public function listBackups(array $filters = []): \Illuminate\Contracts\Pagination\LengthAwarePaginator
+{
+    $query = DB::table('deletion_backups');
 
-        if (isset($filters['entity_type'])) {
-            $query->where('entity_type', $filters['entity_type']);
-        }
+    // Appliquer les filtres
+    if (!empty($filters['entity_type'])) {
+        $query->where('entity_type', $filters['entity_type']);
+    }
 
-        if (isset($filters['entity_id'])) {
-            $query->where('entity_id', $filters['entity_id']);
-        }
+    if (!empty($filters['date_from'])) {
+        $query->whereDate('created_at', '>=', $filters['date_from']);
+    }
 
-        if (isset($filters['from_date'])) {
-            $query->where('created_at', '>=', $filters['from_date']);
-        }
+    if (!empty($filters['date_to'])) {
+        $query->whereDate('created_at', '<=', $filters['date_to']);
+    }
 
-        if (isset($filters['to_date'])) {
-            $query->where('created_at', '<=', $filters['to_date']);
-        }
-
-        if (isset($filters['restored']) && $filters['restored']) {
+    if (!empty($filters['restored'])) {
+        if ($filters['restored'] === 'yes') {
             $query->whereNotNull('restored_at');
-        } elseif (isset($filters['restored']) && !$filters['restored']) {
+        } else {
             $query->whereNull('restored_at');
         }
-
-        return $query->orderBy('created_at', 'desc')
-                     ->limit(100)
-                     ->get()
-                     ->map(function ($backup) {
-                         $backup->backup_data = json_decode($backup->backup_data, true);
-                         return $backup;
-                     });
     }
+
+    // Ordonner par date de création décroissante
+    $query->orderBy('created_at', 'desc');
+
+    // Paginer les résultats
+    $backups = $query->paginate(20);
+
+    // Transformer les données JSON en tableaux PHP
+    $backups->transform(function ($backup) {
+        $backup->backup_data = json_decode($backup->backup_data, true);
+
+        // Ajouter la relation creator si nécessaire
+        if ($backup->created_by) {
+            $backup->creator = DB::table('users')
+                ->where('id', $backup->created_by)
+                ->first(['id', 'name', 'email']);
+        }
+
+        // Convertir les dates en objets Carbon
+        $backup->created_at = Carbon::parse($backup->created_at);
+        $backup->restored_at = $backup->restored_at ? Carbon::parse($backup->restored_at) : null;
+
+        return $backup;
+    });
+
+    return $backups;
+}
 
     /**
      * Nettoie les anciens backups

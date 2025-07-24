@@ -230,9 +230,10 @@ class DeletionRequestController extends Controller
     /**
      * Liste les backups disponibles
      */
-    public function backups(): View
+    public function backups(Request $request): View
     {
-        $backups = $this->backupService->listBackups();
+        $filters = $request->only(['entity_type', 'date_from', 'date_to', 'restored']);
+        $backups = $this->backupService->listBackups($filters);
 
         return view('admin.deletion-requests.backups', compact('backups'));
     }
