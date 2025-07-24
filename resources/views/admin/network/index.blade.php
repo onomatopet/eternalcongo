@@ -36,13 +36,14 @@
                         </div>
                     </div>
 
-                    <div class="p-6 relative">
+                    <div class="p-6">
                         <label class="block text-sm font-medium text-gray-700 mb-3">
                             Recherchez par matricule, nom ou prénom
                         </label>
 
-                        {{-- Barre de recherche moderne --}}
-                        <div class="relative search-container">
+                        {{-- Conteneur de recherche avec position relative --}}
+                        <div class="relative">
+                            {{-- Barre de recherche --}}
                             <div class="relative">
                                 <input type="text"
                                        id="distributeur_search"
@@ -63,12 +64,13 @@
                                 </div>
                             </div>
 
+                            {{-- Résultats de recherche - Positionnement absolu dans le conteneur relatif --}}
+                            <div id="search_results"
+                                 class="hidden absolute mt-1 w-full bg-white rounded-lg shadow-xl border border-gray-200 max-h-80 overflow-y-auto z-50">
+                            </div>
+
                             {{-- Champ caché pour l'ID --}}
                             <input type="hidden" name="distributeur_id" id="distributeur_id" required>
-                        </div>
-
-                        {{-- Résultats de recherche - EN DEHORS du conteneur relative --}}
-                        <div id="search_results" class="hidden fixed mt-1 bg-white rounded-lg shadow-xl border border-gray-200 max-h-80 overflow-y-auto" style="z-index: 9999;">
                         </div>
 
                         {{-- Message d'aide --}}
@@ -240,22 +242,6 @@
             transform: translateY(0);
         }
     }
-
-    /* Fix pour le dropdown qui doit dépasser le conteneur */
-    .search-container {
-        position: relative;
-    }
-
-    /* S'assurer que le dropdown est au-dessus de tout */
-    #search_results {
-        position: absolute !important;
-        z-index: 9999 !important;
-    }
-
-    /* Empêcher le overflow sur les conteneurs parents pendant la recherche */
-    .overflow-visible-on-search {
-        overflow: visible !important;
-    }
 </style>
 @endpush
 
@@ -288,13 +274,6 @@
 
         // Afficher le spinner
         searchSpinner.classList.remove('hidden');
-
-        // Positionner le dropdown
-        const rect = searchInput.getBoundingClientRect();
-        searchResults.style.position = 'fixed';
-        searchResults.style.top = (rect.bottom + 2) + 'px';
-        searchResults.style.left = rect.left + 'px';
-        searchResults.style.width = rect.width + 'px';
 
         searchTimeout = setTimeout(() => {
             fetch(`{{ route('admin.network.search.distributeurs') }}?q=${encodeURIComponent(query)}`)
@@ -464,15 +443,8 @@
             </svg>
             <span>Génération en cours...</span>
         `;
-    // Repositionner le dropdown au scroll ou resize
-    function repositionDropdown() {
-        if (!searchResults.classList.contains('hidden')) {
-            const rect = searchInput.getBoundingClientRect();
-            searchResults.style.top = (rect.bottom + 2) + 'px';
-            searchResults.style.left = rect.left + 'px';
-            searchResults.style.width = rect.width + 'px';
-        }
-    }
+    });
+</script>
+@endpush
 
-    window.addEventListener('scroll', repositionDropdown);
-    window.addEventListener('resize', repositionDropdown);
+@endsection
