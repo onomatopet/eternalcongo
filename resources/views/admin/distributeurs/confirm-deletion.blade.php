@@ -111,18 +111,25 @@
                 <div class="space-y-4">
                     @foreach($validationResult['blockers'] as $blocker)
                     <div class="border-l-4 border-red-400 pl-4">
-                        <h4 class="text-sm font-medium text-red-800">{{ $blocker['message'] }}</h4>
-                        <p class="text-sm text-red-600 mt-1">{{ $blocker['suggested_action'] }}</p>
-
-                        @if(isset($blocker['details']) && is_array($blocker['details']))
-                        <div class="mt-2">
-                            <details class="text-xs text-gray-600">
-                                <summary class="cursor-pointer hover:text-gray-800">Voir les détails</summary>
-                                <div class="mt-2 bg-gray-50 p-2 rounded">
-                                    <pre class="whitespace-pre-wrap">{{ json_encode($blocker['details'], JSON_PRETTY_PRINT) }}</pre>
-                                </div>
-                            </details>
-                        </div>
+                        {{-- Vérifier si $blocker est un tableau ou une chaîne --}}
+                        @if(is_array($blocker))
+                            <h4 class="text-sm font-medium text-red-800">{{ $blocker['message'] ?? $blocker[0] ?? 'Problème non spécifié' }}</h4>
+                            @if(isset($blocker['suggested_action']))
+                                <p class="text-sm text-red-600 mt-1">{{ $blocker['suggested_action'] }}</p>
+                            @endif
+                            @if(isset($blocker['details']) && is_array($blocker['details']))
+                            <div class="mt-2">
+                                <details class="text-xs text-gray-600">
+                                    <summary class="cursor-pointer hover:text-gray-800">Voir les détails</summary>
+                                    <div class="mt-2 bg-gray-50 p-2 rounded">
+                                        <pre class="whitespace-pre-wrap">{{ json_encode($blocker['details'], JSON_PRETTY_PRINT) }}</pre>
+                                    </div>
+                                </details>
+                            </div>
+                            @endif
+                        @else
+                            {{-- Si c'est une chaîne simple --}}
+                            <h4 class="text-sm font-medium text-red-800">{{ $blocker }}</h4>
                         @endif
                     </div>
                     @endforeach
@@ -131,6 +138,7 @@
         </div>
         @endif
 
+        {{-- Faire la même chose pour les warnings --}}
         <!-- Avertissements -->
         @if(!empty($validationResult['warnings']))
         <div class="bg-white shadow-lg rounded-lg">
@@ -140,9 +148,18 @@
             <div class="px-6 py-4">
                 <div class="space-y-3">
                     @foreach($validationResult['warnings'] as $warning)
-                    <div class="border-l-4 border-yellow-400 pl-4">
-                        <h4 class="text-sm font-medium text-yellow-800">{{ $warning['message'] }}</h4>
-                        <p class="text-sm text-yellow-600 mt-1">{{ $warning['suggested_action'] }}</p>
+                    <div class="flex items-start">
+                        <svg class="h-5 w-5 text-yellow-400 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
+                        </svg>
+                        <p class="ml-3 text-sm text-gray-700">
+                            {{-- Vérifier si c'est un tableau ou une chaîne --}}
+                            @if(is_array($warning))
+                                {{ $warning['message'] ?? $warning[0] ?? 'Avertissement non spécifié' }}
+                            @else
+                                {{ $warning }}
+                            @endif
+                        </p>
                     </div>
                     @endforeach
                 </div>
@@ -159,15 +176,56 @@
             <div class="px-6 py-4">
                 <div class="space-y-3">
                     @foreach($cleanupActions as $action)
-                    <div class="flex items-start space-x-3">
-                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
-                            {{ $action['priority'] === 'high' ? 'bg-red-100 text-red-800' :
-                               ($action['priority'] === 'medium' ? 'bg-yellow-100 text-yellow-800' : 'bg-blue-100 text-blue-800') }}">
-                            {{ ucfirst($action['priority']) }}
-                        </span>
-                        <div class="flex-1">
-                            <p class="text-sm font-medium text-gray-900">{{ $action['description'] }}</p>
-                            <p class="text-xs text-gray-500">Temps estimé: {{ $action['estimated_time'] }}</p>
+                    <div class="border rounded-lg p-4 hover:bg-gray-50">
+                        <div class="flex items-start">
+                            <div class="flex-shrink-0">
+                                @php
+                                    $iconColor = match($action['priority'] ?? 'medium') {
+                                        'high' => 'text-red-500',
+                                        'low' => 'text-green-500',
+                                        default => 'text-yellow-500'
+                                    };
+                                @endphp
+                                <svg class="h-6 w-6 {{ $iconColor }}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                                </svg>
+                            </div>
+                            <div class="ml-3 flex-1">
+                                <h4 class="text-sm font-medium text-gray-900">
+                                    {{ $action['description'] ?? 'Action non spécifiée' }}
+                                </h4>
+                                <div class="mt-1 text-xs text-gray-500 space-y-1">
+                                    @if(isset($action['estimated_time']))
+                                        <p>Temps estimé: {{ $action['estimated_time'] }}</p>
+                                    @endif
+                                    @if(isset($action['action']))
+                                        <p>Code action: <code class="bg-gray-100 px-1 rounded">{{ $action['action'] }}</code></p>
+                                    @endif
+                                    <p>Priorité:
+                                        <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium
+                                            @if(($action['priority'] ?? 'medium') == 'high') bg-red-100 text-red-800
+                                            @elseif(($action['priority'] ?? 'medium') == 'low') bg-green-100 text-green-800
+                                            @else bg-yellow-100 text-yellow-800
+                                            @endif">
+                                            {{ ucfirst($action['priority'] ?? 'medium') }}
+                                        </span>
+                                    </p>
+                                </div>
+                                @if(isset($action['details']))
+                                <div class="mt-2">
+                                    <details class="text-xs text-gray-600">
+                                        <summary class="cursor-pointer hover:text-gray-800">Plus de détails</summary>
+                                        <div class="mt-2 bg-gray-50 p-2 rounded">
+                                            @if(is_array($action['details']))
+                                                <pre class="whitespace-pre-wrap">{{ json_encode($action['details'], JSON_PRETTY_PRINT) }}</pre>
+                                            @else
+                                                <p>{{ $action['details'] }}</p>
+                                            @endif
+                                        </div>
+                                    </details>
+                                </div>
+                                @endif
+                            </div>
                         </div>
                     </div>
                     @endforeach

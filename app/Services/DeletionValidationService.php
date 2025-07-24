@@ -22,7 +22,7 @@ class DeletionValidationService
         $relatedData = [];
 
         // 1. Vérifier les enfants directs
-        $children = Distributeur::where('id_distrib_parent', $distributeur->id)->get(); // CORRECTION ICI
+        $children = Distributeur::where('id_distrib_parent', $distributeur->id)->get();
         if ($children->isNotEmpty()) {
             $blockers[] = "Ce distributeur a {$children->count()} distributeur(s) enfant(s) qui doivent être réassignés avant suppression";
             $relatedData['children'] = $children->map(function ($child) {
