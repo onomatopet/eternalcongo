@@ -15,16 +15,19 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Auth;
+use App\Services\CumulManagementService;
 
 class DistributeurController extends Controller
 {
     private BackupService $backupService;
     private DeletionValidationService $validationService;
+    private CumulManagementService $cumulService;
 
-    public function __construct(BackupService $backupService, DeletionValidationService $validationService)
+    public function __construct(BackupService $backupService, DeletionValidationService $validationService, CumulManagementService $cumulService)
     {
         $this->backupService = $backupService;
         $this->validationService = $validationService;
+        $this->cumulService = $cumulService;
     }
 
     /**
@@ -376,7 +379,19 @@ class DistributeurController extends Controller
 
         DB::beginTransaction();
         try {
-            // 1. Créer un backup complet
+            // 1. Créer la demande de suppression (même pour exécution immédiate)
+            $deletionRequest = DeletionRequest::create([
+                'entity_type' => DeletionRequest::ENTITY_DISTRIBUTEUR,
+                'entity_id' => $distributeur->id,
+                'requested_by_id' => Auth::id(),
+                'status' => DeletionRequest::STATUS_APPROVED, // Approuvée automatiquement
+                'reason' => $reason,
+                'validation_data' => $validationResult,
+                'approved_by_id' => Auth::id(),
+                'approved_at' => now(),
+            ]);
+
+            // 2. Créer un backup complet
             $backupResult = $this->backupService->createDeletionBackup(
                 'distributeur',
                 $distributeur->id,
@@ -387,26 +402,34 @@ class DistributeurController extends Controller
                 throw new \Exception("Échec de la création du backup: " . $backupResult['error']);
             }
 
-            // 2. Nettoyer les données liées si nécessaire
+            // 3. Nettoyer les données liées (incluant le transfert des cumuls)
             $this->cleanupRelatedData($distributeur, $validationResult);
 
-            // 3. Log détaillé avant suppression
+            // 4. Log détaillé avant suppression
             Log::info("Suppression immédiate distributeur", [
                 'id' => $distributeur->id,
                 'matricule' => $distributeur->distributeur_id,
                 'nom' => $distributeur->full_name,
                 'reason' => $reason,
                 'backup_id' => $backupResult['backup_id'],
+                'deletion_request_id' => $deletionRequest->id,
                 'user_id' => Auth::id()
             ]);
 
-            // 4. Supprimer le distributeur
+            // 5. Supprimer le distributeur
             $distributeur->delete();
+
+            // 6. Marquer la demande comme complétée
+            $deletionRequest->markAsCompleted([
+                'backup_id' => $backupResult['backup_id'],
+                'executed_by' => Auth::id(),
+                'execution_type' => 'immediate'
+            ]);
 
             DB::commit();
 
             return redirect()
-                ->route('admin.distributeurs.index')
+                ->route('admin.deletion-requests.show', $deletionRequest)
                 ->with('success', 'Distributeur supprimé avec succès. Backup: #' . $backupResult['backup_id']);
 
         } catch (\Exception $e) {
@@ -574,14 +597,44 @@ class DistributeurController extends Controller
         return false;
     }
 
-    /**
-     * Nettoie les données liées avant suppression
-     */
+    //**
+    // * Nettoie les données liées avant suppression (MISE À JOUR)
+    // */
     private function cleanupRelatedData(Distributeur $distributeur, array $validationResult): void
     {
-        // Supprimer les level_currents orphelins
-        if (isset($validationResult['related_data']['level_currents'])) {
-            $distributeur->levelCurrents()->delete();
+        $currentPeriod = date('Y-m');
+
+        // 1. Gérer le transfert des cumuls et la réorganisation hiérarchique
+        $transferResult = $this->cumulService->handleDistributeurDeletion($distributeur, $currentPeriod);
+
+        if (!$transferResult['success']) {
+            throw new \Exception("Erreur lors du transfert des cumuls: " . $transferResult['message']);
+        }
+
+        // 2. Log du transfert
+        if ($transferResult['transferred_amount'] > 0) {
+            Log::info("Cumuls transférés lors de la suppression", [
+                'distributeur_supprime' => $distributeur->distributeur_id,
+                'montant_transfere' => $transferResult['transferred_amount'],
+                'parent_beneficiaire' => $transferResult['affected_parent'],
+                'period' => $currentPeriod
+            ]);
+        }
+
+        // 3. Supprimer les enregistrements level_currents du distributeur
+        $distributeur->levelCurrents()->delete();
+
+        // 4. Supprimer les autres données liées (achats, bonus, etc.)
+        if (isset($validationResult['related_data']['achats'])) {
+            $distributeur->achats()->delete();
+        }
+
+        if (isset($validationResult['related_data']['bonuses'])) {
+            $distributeur->bonuses()->delete();
+        }
+
+        if (isset($validationResult['related_data']['advancement_history'])) {
+            $distributeur->avancementHistory()->delete();
         }
     }
 

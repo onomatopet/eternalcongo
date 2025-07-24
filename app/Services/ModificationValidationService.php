@@ -8,9 +8,16 @@ use App\Models\LevelCurrent;
 use App\Models\Bonus;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use App\Services\CumulManagementService;
 
 class ModificationValidationService
 {
+    private CumulManagementService $cumulService;
+
+    public function __construct(CumulManagementService $cumulService)
+    {
+        $this->cumulService = $cumulService;
+    }
     /**
      * Valide une demande de changement de parent
      */
@@ -45,7 +52,7 @@ class ModificationValidationService
         // 4. Impact sur les calculs MLM
         $currentPeriod = date('Y-m');
         $affectedLevels = $this->getAffectedLevels($distributeur, $newParent);
-        
+
         if ($affectedLevels > 0) {
             $result['impact']['affected_levels'] = $affectedLevels;
             $result['warnings'][] = "Ce changement affectera {$affectedLevels} niveaux dans la hiérarchie";
@@ -55,7 +62,7 @@ class ModificationValidationService
         $activeBonus = Bonus::where('distributeur_id', $distributeur->id)
                            ->where('period', $currentPeriod)
                            ->exists();
-        
+
         if ($activeBonus) {
             $result['warnings'][] = "Des bonus ont déjà été calculés pour la période en cours";
             $result['impact']['recalculation_needed'] = true;
@@ -100,7 +107,7 @@ class ModificationValidationService
 
         if ($currentLevel) {
             $expectedGrade = $this->calculateExpectedGrade($currentLevel);
-            
+
             if ($newGrade > $expectedGrade + 1) {
                 $result['warnings'][] = "Le nouveau grade est supérieur au grade calculé ({$expectedGrade})";
                 $result['justification_required'] = true;
@@ -157,7 +164,7 @@ class ModificationValidationService
         if (isset($newValues['cumul_individuel'])) {
             $oldGrade = $levelCurrent->etoiles;
             $newGrade = $this->calculateGradeFromCumul($newValues['cumul_individuel']);
-            
+
             if ($newGrade !== $oldGrade) {
                 $result['warnings'][] = "Cet ajustement changera le grade de {$oldGrade} à {$newGrade}";
                 $result['impact']['grade_change'] = [
@@ -202,7 +209,7 @@ class ModificationValidationService
             if ($result['success']) {
                 $request->markAsExecuted($result);
                 DB::commit();
-                
+
                 Log::info("Modification exécutée avec succès", [
                     'request_id' => $request->id,
                     'type' => $request->modification_type,
@@ -216,7 +223,7 @@ class ModificationValidationService
 
         } catch (\Exception $e) {
             DB::rollBack();
-            
+
             Log::error("Erreur lors de l'exécution de la modification", [
                 'request_id' => $request->id,
                 'error' => $e->getMessage(),
@@ -242,30 +249,76 @@ class ModificationValidationService
 
         $oldParentId = $distributeur->id_distrib_parent;
         $newParentId = $request->new_values['id_distrib_parent'];
+        $currentPeriod = date('Y-m');
 
-        // 1. Mettre à jour le parent
-        $distributeur->update(['id_distrib_parent' => $newParentId]);
+        DB::beginTransaction();
+        try {
+            // 1. Mettre à jour le parent dans la table distributeurs
+            $distributeur->update(['id_distrib_parent' => $newParentId]);
 
-        // 2. Recalculer les cumuls collectifs
-        $this->recalculateCollectiveCumuls($oldParentId);
-        $this->recalculateCollectiveCumuls($newParentId);
+            // 2. Mettre à jour dans level_currents pour la période courante
+            LevelCurrent::where('distributeur_id', $distributeur->id)
+                        ->where('period', $currentPeriod)
+                        ->update(['id_distrib_parent' => $newParentId]);
 
-        // 3. Logger le changement
-        Log::info("Changement de parent exécuté", [
-            'distributeur_id' => $distributeur->id,
-            'ancien_parent' => $oldParentId,
-            'nouveau_parent' => $newParentId
-        ]);
+            // 3. Recalculer les cumuls collectifs et totaux
+            $recalcResult = $this->cumulService->recalculateAfterParentChange(
+                $distributeur,
+                $oldParentId,
+                $newParentId,
+                $currentPeriod
+            );
 
-        return [
-            'success' => true,
-            'details' => [
+            if (!$recalcResult['success']) {
+                throw new \Exception($recalcResult['message']);
+            }
+
+            // 4. Recalculer les cumuls individuels des parents affectés
+            if ($oldParentId) {
+                $this->cumulService->recalculateIndividualCumul($oldParentId, $currentPeriod);
+            }
+            if ($newParentId) {
+                $this->cumulService->recalculateIndividualCumul($newParentId, $currentPeriod);
+            }
+
+            DB::commit();
+
+            // 5. Logger le changement
+            Log::info("Changement de parent exécuté avec succès", [
                 'distributeur_id' => $distributeur->id,
-                'old_parent_id' => $oldParentId,
-                'new_parent_id' => $newParentId,
-                'timestamp' => now()
-            ]
-        ];
+                'matricule' => $distributeur->distributeur_id,
+                'ancien_parent' => $oldParentId,
+                'nouveau_parent' => $newParentId,
+                'period' => $currentPeriod,
+                'cumuls_deplaces' => $recalcResult['amount_moved']
+            ]);
+
+            return [
+                'success' => true,
+                'details' => [
+                    'distributeur_id' => $distributeur->id,
+                    'old_parent_id' => $oldParentId,
+                    'new_parent_id' => $newParentId,
+                    'period_affected' => $currentPeriod,
+                    'cumuls_moved' => $recalcResult['amount_moved'],
+                    'timestamp' => now()
+                ]
+            ];
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+
+            Log::error("Erreur lors du changement de parent", [
+                'distributeur_id' => $distributeur->id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+
+            return [
+                'success' => false,
+                'error' => $e->getMessage()
+            ];
+        }
     }
 
     /**
@@ -336,7 +389,7 @@ class ModificationValidationService
             $newGrade = $this->calculateGradeFromCumul($request->new_values['cumul_individuel']);
             if ($newGrade !== $levelCurrent->etoiles) {
                 $levelCurrent->update(['etoiles' => $newGrade]);
-                
+
                 // Mettre à jour aussi dans distributeurs
                 Distributeur::where('id', $levelCurrent->distributeur_id)
                            ->update(['etoiles_id' => $newGrade]);
@@ -392,10 +445,10 @@ class ModificationValidationService
     {
         // Calculer la profondeur de l'ancienne branche
         $oldDepth = $this->calculateBranchDepth($distributeur);
-        
+
         // Calculer la nouvelle profondeur
         $newParentDepth = $this->getDistributorDepth($newParent);
-        
+
         return abs($oldDepth + $newParentDepth);
     }
 
@@ -405,13 +458,13 @@ class ModificationValidationService
     private function calculateBranchDepth(Distributeur $distributeur): int
     {
         $maxDepth = 0;
-        
+
         $children = $distributeur->children;
         foreach ($children as $child) {
             $childDepth = 1 + $this->calculateBranchDepth($child);
             $maxDepth = max($maxDepth, $childDepth);
         }
-        
+
         return $maxDepth;
     }
 
@@ -422,25 +475,25 @@ class ModificationValidationService
     {
         $depth = 0;
         $current = $distributeur;
-        
+
         while ($current->parent) {
             $depth++;
             $current = $current->parent;
         }
-        
+
         return $depth;
     }
 
     /**
-     * Calcule le grade basé sur le cumul
+     * Calcule le grade basé sur le cumul individuel
      */
-    private function calculateGradeFromCumul(int $cumul): int
+    private function calculateGradeFromCumul(float $cumulIndividuel): int
     {
-        // TODO: Implémenter selon vos règles métier
-        if ($cumul >= 50000) return 5;
-        if ($cumul >= 25000) return 4;
-        if ($cumul >= 10000) return 3;
-        if ($cumul >= 5000) return 2;
+        // À adapter selon vos règles métier
+        // Exemple simplifié :
+        if ($cumulIndividuel >= 1000) return 4;
+        if ($cumulIndividuel >= 200) return 3;
+        if ($cumulIndividuel >= 100) return 2;
         return 1;
     }
 
