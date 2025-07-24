@@ -1,322 +1,431 @@
+{{-- resources/views/admin/deletion-requests/index.blade.php --}}
+
 @extends('layouts.admin')
 
-@section('title', 'Demandes de Suppression')
+@section('title', 'Demandes de suppression')
 
 @section('content')
-<div class="container-fluid">
-    {{-- Statistiques --}}
-    <div class="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
-        <div class="bg-white rounded-lg shadow p-5">
-            <div class="flex items-center">
-                <div class="flex-shrink-0">
-                    <div class="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center">
-                        <svg class="w-6 h-6 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-                        </svg>
-                    </div>
-                </div>
-                <div class="ml-5 w-0 flex-1">
-                    <dl>
-                        <dt class="text-sm font-medium text-gray-500 truncate">Total</dt>
-                        <dd class="text-lg font-semibold text-gray-900">{{ $stats['total'] }}</dd>
-                    </dl>
-                </div>
+<div class="min-h-screen bg-gray-50 py-8">
+    <div class="px-4 sm:px-6 lg:px-8">
+        {{-- En-tête avec fil d'Ariane --}}
+        <div class="bg-white rounded-lg shadow-sm px-6 py-4 mb-6">
+            <nav class="flex items-center text-sm">
+                <a href="{{ route('admin.dashboard') }}" class="text-gray-500 hover:text-gray-700 transition-colors duration-200">
+                    <svg class="w-4 h-4 mr-1 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/>
+                    </svg>
+                    Tableau de Bord
+                </a>
+                <span class="mx-2 text-gray-400">/</span>
+                <span class="text-gray-700 font-medium">Demandes de suppression</span>
+            </nav>
+        </div>
+
+        {{-- Titre et actions --}}
+        <div class="mb-8 flex flex-col sm:flex-row sm:items-center sm:justify-between">
+            <div>
+                <h1 class="text-3xl font-bold text-gray-900">Demandes de suppression</h1>
+                <p class="mt-2 text-gray-600">Gérez les demandes de suppression avec workflow d'approbation</p>
             </div>
-        </div>
-
-        <div class="bg-white rounded-lg shadow p-5">
-            <div class="flex items-center">
-                <div class="flex-shrink-0">
-                    <div class="w-12 h-12 bg-yellow-100 rounded-full flex items-center justify-center">
-                        <svg class="w-6 h-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                        </svg>
-                    </div>
-                </div>
-                <div class="ml-5 w-0 flex-1">
-                    <dl>
-                        <dt class="text-sm font-medium text-gray-500 truncate">En attente</dt>
-                        <dd class="text-lg font-semibold text-yellow-600">{{ $stats['pending'] }}</dd>
-                    </dl>
-                </div>
-            </div>
-        </div>
-
-        <div class="bg-white rounded-lg shadow p-5">
-            <div class="flex items-center">
-                <div class="flex-shrink-0">
-                    <div class="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
-                        <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                        </svg>
-                    </div>
-                </div>
-                <div class="ml-5 w-0 flex-1">
-                    <dl>
-                        <dt class="text-sm font-medium text-gray-500 truncate">Approuvées</dt>
-                        <dd class="text-lg font-semibold text-blue-600">{{ $stats['approved'] }}</dd>
-                    </dl>
-                </div>
-            </div>
-        </div>
-
-        <div class="bg-white rounded-lg shadow p-5">
-            <div class="flex items-center">
-                <div class="flex-shrink-0">
-                    <div class="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
-                        <svg class="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
-                        </svg>
-                    </div>
-                </div>
-                <div class="ml-5 w-0 flex-1">
-                    <dl>
-                        <dt class="text-sm font-medium text-gray-500 truncate">Exécutées</dt>
-                        <dd class="text-lg font-semibold text-green-600">{{ $stats['completed'] }}</dd>
-                    </dl>
-                </div>
-            </div>
-        </div>
-
-        <div class="bg-white rounded-lg shadow p-5">
-            <div class="flex items-center">
-                <div class="flex-shrink-0">
-                    <div class="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center">
-                        <svg class="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-                        </svg>
-                    </div>
-                </div>
-                <div class="ml-5 w-0 flex-1">
-                    <dl>
-                        <dt class="text-sm font-medium text-gray-500 truncate">Rejetées</dt>
-                        <dd class="text-lg font-semibold text-red-600">{{ $stats['rejected'] }}</dd>
-                    </dl>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    {{-- Filtres --}}
-    <div class="bg-white shadow rounded-lg mb-6">
-        <div class="px-6 py-4 border-b border-gray-200">
-            <h3 class="text-lg font-medium text-gray-900">Filtres</h3>
-        </div>
-        <div class="px-6 py-4">
-            <form method="GET" class="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <div>
-                    <label for="status" class="block text-sm font-medium text-gray-700">Statut</label>
-                    <select name="status" id="status" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
-                        <option value="">Tous</option>
-                        <option value="pending" {{ request('status') == 'pending' ? 'selected' : '' }}>En attente</option>
-                        <option value="approved" {{ request('status') == 'approved' ? 'selected' : '' }}>Approuvées</option>
-                        <option value="completed" {{ request('status') == 'completed' ? 'selected' : '' }}>Exécutées</option>
-                        <option value="rejected" {{ request('status') == 'rejected' ? 'selected' : '' }}>Rejetées</option>
-                    </select>
-                </div>
-
-                <div>
-                    <label for="entity_type" class="block text-sm font-medium text-gray-700">Type d'entité</label>
-                    <select name="entity_type" id="entity_type" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
-                        <option value="">Tous</option>
-                        <option value="distributeur" {{ request('entity_type') == 'distributeur' ? 'selected' : '' }}>Distributeur</option>
-                        <option value="achat" {{ request('entity_type') == 'achat' ? 'selected' : '' }}>Achat</option>
-                        <option value="product" {{ request('entity_type') == 'product' ? 'selected' : '' }}>Produit</option>
-                        <option value="bonus" {{ request('entity_type') == 'bonus' ? 'selected' : '' }}>Bonus</option>
-                    </select>
-                </div>
-
-                <div>
-                    <label for="requested_by" class="block text-sm font-medium text-gray-700">Demandeur</label>
-                    <input type="text" name="requested_by" id="requested_by" value="{{ request('requested_by') }}"
-                           placeholder="Nom du demandeur..."
-                           class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
-                </div>
-
-                <div class="flex items-end gap-2">
-                    <button type="submit" class="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
-                        <svg class="-ml-1 mr-2 h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"></path>
-                        </svg>
-                        Filtrer
-                    </button>
-                    <a href="{{ route('admin.deletion-requests.index') }}" class="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
-                        Réinitialiser
-                    </a>
-                </div>
-            </form>
-        </div>
-    </div>
-
-    {{-- Liste des demandes --}}
-    <div class="bg-white shadow rounded-lg overflow-hidden">
-        <div class="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
-            <h3 class="text-lg font-medium text-gray-900">Demandes de suppression</h3>
-            @if($deletionRequests->total() > 0)
-                <a href="{{ route('admin.deletion-requests.export', request()->query()) }}" class="inline-flex items-center px-3 py-1.5 border border-gray-300 shadow-sm text-xs font-medium rounded text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
-                    <svg class="-ml-0.5 mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+            <div class="mt-4 sm:mt-0 flex space-x-3">
+                <a href="{{ route('admin.deletion-requests.backups') }}"
+                   class="inline-flex items-center px-4 py-2 bg-purple-600 text-white text-sm font-medium rounded-lg hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 transition-colors duration-200">
+                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10"/>
+                    </svg>
+                    Gérer les backups
+                </a>
+                <a href="{{ route('admin.deletion-requests.export') }}"
+                   class="inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium rounded-lg text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 transition-colors duration-200">
+                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
                     </svg>
                     Exporter
                 </a>
-            @endif
+            </div>
         </div>
 
-        @if($deletionRequests->count() > 0)
-            <table class="min-w-full divide-y divide-gray-200">
-                <thead class="bg-gray-50">
-                    <tr>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ID</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Entité</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Statut</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Demandeur</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
-                        <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-                    </tr>
-                </thead>
-                <tbody class="bg-white divide-y divide-gray-200">
-                    @foreach($deletionRequests as $request)
-                        <tr>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                                #{{ $request->id }}
-                            </td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
-                                    {{ ucfirst($request->entity_type) }}
-                                </span>
-                            </td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                {{ $request->getEntityName() }}
-                            </td>
-                            <td class="px-6 py-4 whitespace-nowrap">
-                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
-                                    @if($request->status == 'pending') bg-yellow-100 text-yellow-800
-                                    @elseif($request->status == 'approved') bg-blue-100 text-blue-800
-                                    @elseif($request->status == 'completed') bg-green-100 text-green-800
-                                    @elseif($request->status == 'rejected') bg-red-100 text-red-800
-                                    @else bg-gray-100 text-gray-800
-                                    @endif">
-                                    {{ $request->getStatusLabel() }}
-                                </span>
-                            </td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                {{ $request->requestedBy->name ?? 'N/A' }}
-                            </td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                {{ $request->created_at->format('d/m/Y H:i') }}
-                            </td>
-                            <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                <div class="flex justify-end space-x-2">
-                                    <a href="{{ route('admin.deletion-requests.show', $request) }}"
-                                       class="text-indigo-600 hover:text-indigo-900">
-                                        Voir
-                                    </a>
-
-                                    @if($request->isPending() && Auth::user()->hasPermission('approve_deletions'))
-                                        <form action="{{ route('admin.deletion-requests.approve', $request) }}" method="POST" class="inline">
-                                            @csrf
-                                            <button type="submit" class="text-green-600 hover:text-green-900 ml-2"
-                                                    onclick="return confirm('Approuver cette demande ?')">
-                                                Approuver
-                                            </button>
-                                        </form>
-
-                                        <button onclick="openRejectModal({{ $request->id }})"
-                                                class="text-red-600 hover:text-red-900 ml-2">
-                                            Rejeter
-                                        </button>
-                                    @endif
-
-                                    @if($request->isApproved() && !$request->isCompleted() && Auth::user()->hasPermission('execute_deletions'))
-                                        <form action="{{ route('admin.deletion-requests.execute', $request) }}" method="POST" class="inline">
-                                            @csrf
-                                            <button type="submit" class="text-orange-600 hover:text-orange-900 ml-2"
-                                                    onclick="return confirm('Exécuter la suppression maintenant ? Cette action est irréversible.')">
-                                                Exécuter
-                                            </button>
-                                        </form>
-                                    @endif
-                                </div>
-                            </td>
-                        </tr>
-                    @endforeach
-                </tbody>
-            </table>
-
-            <div class="px-6 py-4 border-t border-gray-200">
-                {{ $deletionRequests->withQueryString()->links() }}
-            </div>
-        @else
-            <div class="text-center py-12">
-                <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-                </svg>
-                <h3 class="mt-2 text-sm font-medium text-gray-900">Aucune demande trouvée</h3>
-                <p class="mt-1 text-sm text-gray-500">Aucune demande de suppression ne correspond aux critères.</p>
-            </div>
-        @endif
-    </div>
-</div>
-
-{{-- Modal de rejet --}}
-<div id="rejectModal" class="hidden fixed z-10 inset-0 overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
-    <div class="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
-        <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" aria-hidden="true"></div>
-        <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
-
-        <div class="inline-block align-bottom bg-white rounded-lg px-4 pt-5 pb-4 text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full sm:p-6">
-            <form id="rejectForm" method="POST">
-                @csrf
-                <div>
-                    <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100">
-                        <svg class="h-6 w-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+        {{-- Messages flash --}}
+        @if(session('success'))
+            <div class="mb-6 bg-green-50 border-l-4 border-green-400 p-4 rounded-lg">
+                <div class="flex">
+                    <div class="flex-shrink-0">
+                        <svg class="h-5 w-5 text-green-400" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
                         </svg>
                     </div>
-                    <div class="mt-3 text-center sm:mt-5">
-                        <h3 class="text-lg leading-6 font-medium text-gray-900" id="modal-title">
-                            Rejeter la demande
-                        </h3>
-                        <div class="mt-2">
-                            <p class="text-sm text-gray-500">
-                                Veuillez indiquer la raison du rejet de cette demande.
-                            </p>
-                        </div>
+                    <div class="ml-3">
+                        <p class="text-sm text-green-700">{{ session('success') }}</p>
                     </div>
                 </div>
-                <div class="mt-5">
-                    <label for="rejection_reason" class="block text-sm font-medium text-gray-700">
-                        Raison du rejet
-                    </label>
-                    <textarea id="rejection_reason" name="rejection_reason" rows="3" required
-                              class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-                              placeholder="Expliquez pourquoi cette demande est rejetée..."></textarea>
+            </div>
+        @endif
+
+        {{-- Statistiques rapides --}}
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
+            <div class="bg-white rounded-lg shadow-sm p-6">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0 bg-gray-100 rounded-full p-3">
+                        <svg class="h-6 w-6 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/>
+                        </svg>
+                    </div>
+                    <div class="ml-4">
+                        <p class="text-sm font-medium text-gray-600">Total</p>
+                        <p class="text-2xl font-semibold text-gray-900">{{ $stats['total'] ?? 0 }}</p>
+                    </div>
                 </div>
-                <div class="mt-5 sm:mt-6 sm:grid sm:grid-cols-2 sm:gap-3 sm:grid-flow-row-dense">
-                    <button type="submit" class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-red-600 text-base font-medium text-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 sm:col-start-2 sm:text-sm">
-                        Rejeter
-                    </button>
-                    <button type="button" onclick="closeRejectModal()" class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:col-start-1 sm:mt-0 sm:text-sm">
-                        Annuler
-                    </button>
+            </div>
+
+            <div class="bg-white rounded-lg shadow-sm p-6">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0 bg-yellow-100 rounded-full p-3">
+                        <svg class="h-6 w-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                        </svg>
+                    </div>
+                    <div class="ml-4">
+                        <p class="text-sm font-medium text-gray-600">En attente</p>
+                        <p class="text-2xl font-semibold text-gray-900">{{ $stats['pending'] ?? 0 }}</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-lg shadow-sm p-6">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0 bg-blue-100 rounded-full p-3">
+                        <svg class="h-6 w-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                        </svg>
+                    </div>
+                    <div class="ml-4">
+                        <p class="text-sm font-medium text-gray-600">Approuvées</p>
+                        <p class="text-2xl font-semibold text-gray-900">{{ $stats['approved'] ?? 0 }}</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-lg shadow-sm p-6">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0 bg-green-100 rounded-full p-3">
+                        <svg class="h-6 w-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                        </svg>
+                    </div>
+                    <div class="ml-4">
+                        <p class="text-sm font-medium text-gray-600">Complétées</p>
+                        <p class="text-2xl font-semibold text-gray-900">{{ $stats['completed'] ?? 0 }}</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-lg shadow-sm p-6">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0 bg-red-100 rounded-full p-3">
+                        <svg class="h-6 w-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                        </svg>
+                    </div>
+                    <div class="ml-4">
+                        <p class="text-sm font-medium text-gray-600">Rejetées</p>
+                        <p class="text-2xl font-semibold text-gray-900">{{ $stats['rejected'] ?? 0 }}</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {{-- Filtres de recherche --}}
+        <div class="bg-white rounded-lg shadow-sm p-6 mb-6">
+            <form method="GET" action="{{ route('admin.deletion-requests.index') }}" class="space-y-4">
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    {{-- Statut --}}
+                    <div>
+                        <label for="status" class="block text-sm font-medium text-gray-700 mb-1">Statut</label>
+                        <select name="status"
+                                id="status"
+                                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 transition-colors duration-200">
+                            <option value="">Tous les statuts</option>
+                            <option value="pending" {{ request('status') == 'pending' ? 'selected' : '' }}>En attente</option>
+                            <option value="approved" {{ request('status') == 'approved' ? 'selected' : '' }}>Approuvée</option>
+                            <option value="completed" {{ request('status') == 'completed' ? 'selected' : '' }}>Complétée</option>
+                            <option value="rejected" {{ request('status') == 'rejected' ? 'selected' : '' }}>Rejetée</option>
+                            <option value="cancelled" {{ request('status') == 'cancelled' ? 'selected' : '' }}>Annulée</option>
+                        </select>
+                    </div>
+
+                    {{-- Type d'entité --}}
+                    <div>
+                        <label for="entity_type" class="block text-sm font-medium text-gray-700 mb-1">Type d'entité</label>
+                        <select name="entity_type"
+                                id="entity_type"
+                                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 transition-colors duration-200">
+                            <option value="">Tous les types</option>
+                            <option value="distributeur" {{ request('entity_type') == 'distributeur' ? 'selected' : '' }}>Distributeur</option>
+                            <option value="achat" {{ request('entity_type') == 'achat' ? 'selected' : '' }}>Achat</option>
+                            <option value="product" {{ request('entity_type') == 'product' ? 'selected' : '' }}>Produit</option>
+                            <option value="bonus" {{ request('entity_type') == 'bonus' ? 'selected' : '' }}>Bonus</option>
+                        </select>
+                    </div>
+
+                    {{-- Demandé par --}}
+                    <div>
+                        <label for="requested_by" class="block text-sm font-medium text-gray-700 mb-1">Demandé par</label>
+                        <input type="text"
+                               name="requested_by_search"
+                               id="requested_by_search"
+                               value="{{ request('requested_by_search') }}"
+                               placeholder="Rechercher un utilisateur..."
+                               class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 transition-colors duration-200">
+                    </div>
+
+                    {{-- Boutons --}}
+                    <div class="flex items-end space-x-2">
+                        <button type="submit"
+                                class="flex-1 px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 transition-colors duration-200">
+                            <svg class="w-5 h-5 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                            </svg>
+                            Filtrer
+                        </button>
+                        <a href="{{ route('admin.deletion-requests.index') }}"
+                           class="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors duration-200">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                            </svg>
+                        </a>
+                    </div>
                 </div>
             </form>
+        </div>
+
+        {{-- Tableau des demandes --}}
+        <div class="bg-white rounded-lg shadow-sm overflow-hidden">
+            @if($deletionRequests->count() > 0)
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    ID / Date
+                                </th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    Type / Entité
+                                </th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    Demandé par
+                                </th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    Raison
+                                </th>
+                                <th scope="col" class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    Statut
+                                </th>
+                                <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    Actions
+                                </th>
+                            </tr>
+                        </thead>
+                        <tbody class="bg-white divide-y divide-gray-200">
+                            @foreach($deletionRequests as $request)
+                                <tr class="hover:bg-gray-50 transition-colors duration-200">
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <div>
+                                            <div class="text-sm font-medium text-gray-900">#{{ $request->id }}</div>
+                                            <div class="text-sm text-gray-500">{{ $request->created_at->format('d/m/Y H:i') }}</div>
+                                        </div>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <div>
+                                            <div class="text-sm font-medium text-gray-900 capitalize">{{ $request->entity_type }}</div>
+                                            <div class="text-sm text-gray-500">ID: {{ $request->entity_id }}</div>
+                                        </div>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <div class="flex items-center">
+                                            <div class="flex-shrink-0 h-8 w-8">
+                                                <div class="h-8 w-8 rounded-full bg-gray-200 flex items-center justify-center">
+                                                    <span class="text-gray-600 font-medium text-xs">
+                                                        {{ substr($request->requestedBy->name ?? 'S', 0, 1) }}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                            <div class="ml-3">
+                                                <div class="text-sm font-medium text-gray-900">
+                                                    {{ $request->requestedBy->name ?? 'Système' }}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td class="px-6 py-4">
+                                        <div class="text-sm text-gray-900 max-w-xs truncate">
+                                            {{ $request->reason }}
+                                        </div>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-center">
+                                        @switch($request->status)
+                                            @case('pending')
+                                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                                                    <svg class="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                                                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clip-rule="evenodd"/>
+                                                    </svg>
+                                                    En attente
+                                                </span>
+                                                @break
+                                            @case('approved')
+                                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                                    <svg class="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                                                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+                                                    </svg>
+                                                    Approuvée
+                                                </span>
+                                                @break
+                                            @case('completed')
+                                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                                    <svg class="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                                                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+                                                    </svg>
+                                                    Complétée
+                                                </span>
+                                                @break
+                                            @case('rejected')
+                                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                                                    <svg class="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                                                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"/>
+                                                    </svg>
+                                                    Rejetée
+                                                </span>
+                                                @break
+                                            @case('cancelled')
+                                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                                                    <svg class="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                                                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"/>
+                                                    </svg>
+                                                    Annulée
+                                                </span>
+                                                @break
+                                        @endswitch
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                        <div class="flex items-center justify-end space-x-2">
+                                            <a href="{{ route('admin.deletion-requests.show', $request) }}"
+                                               class="text-blue-600 hover:text-blue-900 transition-colors duration-200"
+                                               title="Voir les détails">
+                                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+                                                </svg>
+                                            </a>
+
+                                            @if($request->status === 'pending' && Auth::user()->hasPermission('approve_deletions'))
+                                                <form action="{{ route('admin.deletion-requests.approve', $request) }}"
+                                                      method="POST"
+                                                      class="inline"
+                                                      onsubmit="return confirm('Approuver cette demande de suppression ?');">
+                                                    @csrf
+                                                    <button type="submit"
+                                                            class="text-green-600 hover:text-green-900 transition-colors duration-200"
+                                                            title="Approuver">
+                                                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                                                        </svg>
+                                                    </button>
+                                                </form>
+
+                                                <form action="{{ route('admin.deletion-requests.reject', $request) }}"
+                                                      method="POST"
+                                                      class="inline"
+                                                      onsubmit="return confirm('Rejeter cette demande de suppression ?');">
+                                                    @csrf
+                                                    <button type="submit"
+                                                            class="text-red-600 hover:text-red-900 transition-colors duration-200"
+                                                            title="Rejeter">
+                                                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                                                        </svg>
+                                                    </button>
+                                                </form>
+                                            @endif
+
+                                            @if($request->status === 'approved' && Auth::user()->hasPermission('execute_deletions'))
+                                                <form action="{{ route('admin.deletion-requests.execute', $request) }}"
+                                                      method="POST"
+                                                      class="inline"
+                                                      onsubmit="return confirm('⚠️ ATTENTION : Cette action va supprimer définitivement l\'entité. Continuer ?');">
+                                                    @csrf
+                                                    <button type="submit"
+                                                            class="text-orange-600 hover:text-orange-900 transition-colors duration-200"
+                                                            title="Exécuter la suppression">
+                                                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                                                        </svg>
+                                                    </button>
+                                                </form>
+                                            @endif
+
+                                            @if($request->status === 'pending' &&
+                                                ($request->requested_by_id === Auth::id() || Auth::user()->hasPermission('manage_all_deletion_requests')))
+                                                <form action="{{ route('admin.deletion-requests.cancel', $request) }}"
+                                                      method="POST"
+                                                      class="inline"
+                                                      onsubmit="return confirm('Annuler cette demande ?');">
+                                                    @csrf
+                                                    <button type="submit"
+                                                            class="text-gray-600 hover:text-gray-900 transition-colors duration-200"
+                                                            title="Annuler">
+                                                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                                        </svg>
+                                                    </button>
+                                                </form>
+                                            @endif
+                                        </div>
+                                    </td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+
+                {{-- Pagination --}}
+                <div class="bg-white px-4 py-3 border-t border-gray-200 sm:px-6">
+                    {{ $deletionRequests->withQueryString()->links() }}
+                </div>
+            @else
+                {{-- Message vide --}}
+                <div class="text-center py-12">
+                    <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                    </svg>
+                    <h3 class="mt-2 text-sm font-medium text-gray-900">Aucune demande de suppression</h3>
+                    <p class="mt-1 text-sm text-gray-500">
+                        @if(request()->anyFilled(['status', 'entity_type', 'requested_by_search']))
+                            Aucune demande ne correspond à vos critères de recherche.
+                        @else
+                            Aucune demande de suppression n'a été créée.
+                        @endif
+                    </p>
+                    <div class="mt-6">
+                        @if(request()->anyFilled(['status', 'entity_type', 'requested_by_search']))
+                            <a href="{{ route('admin.deletion-requests.index') }}"
+                               class="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
+                                Réinitialiser les filtres
+                            </a>
+                        @endif
+                    </div>
+                </div>
+            @endif
         </div>
     </div>
 </div>
 
 @push('scripts')
 <script>
-function openRejectModal(requestId) {
-    document.getElementById('rejectForm').action = `/admin/deletion-requests/${requestId}/reject`;
-    document.getElementById('rejectModal').classList.remove('hidden');
-}
-
-function closeRejectModal() {
-    document.getElementById('rejectModal').classList.add('hidden');
-    document.getElementById('rejection_reason').value = '';
-}
+    // Auto-submit form on select change
+    document.querySelectorAll('select[name="status"], select[name="entity_type"]').forEach(select => {
+        select.addEventListener('change', function() {
+            this.closest('form').submit();
+        });
+    });
 </script>
 @endpush
 @endsection

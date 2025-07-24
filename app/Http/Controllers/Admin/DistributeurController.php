@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Distributeur;
+use App\Models\AvancementHistory;
 use App\Models\DeletionRequest;
 use App\Services\BackupService;
 use App\Services\DeletionValidationService;
@@ -249,90 +250,174 @@ class DistributeurController extends Controller
     /**
      * Update the specified resource in storage.
      */
-    public function update(Request $request, Distributeur $distributeur): RedirectResponse
+    public function update(Request $request, Distributeur $distributeur)
     {
-        // Validation des données (matricule unique sauf pour ce distributeur)
+        // Validation des données
         $validatedData = $request->validate([
-            'distributeur_id' => 'required|string|max:20|unique:distributeurs,distributeur_id,' . $distributeur->id,
-            'nom_distributeur' => 'required|string|max:100',
-            'pnom_distributeur' => 'required|string|max:100',
+            'nom_distributeur' => 'required|string|max:255',
+            'pnom_distributeur' => 'required|string|max:255',
             'tel_distributeur' => 'nullable|string|max:20',
             'adress_distributeur' => 'nullable|string|max:255',
             'id_distrib_parent' => 'nullable|exists:distributeurs,id',
-            'etoiles_id' => 'nullable|integer|min:0|max:10',
+            'etoiles_id' => 'required|integer|min:1|max:10',
             'rang' => 'nullable|integer|min:0',
-            'statut_validation_periode' => 'nullable|boolean'
+            'statut_validation_periode' => 'boolean',
+            'cumul_individuel' => 'nullable|numeric|min:0',
+            'cumul_collectif' => 'nullable|numeric|min:0',
         ]);
+
+        // Validation supplémentaire : cumul_collectif >= cumul_individuel
+        if ($request->filled('cumul_individuel') && $request->filled('cumul_collectif')) {
+            if ($request->cumul_collectif < $request->cumul_individuel) {
+                return back()->withErrors([
+                    'cumul_collectif' => 'Le cumul collectif doit être supérieur ou égal au cumul individuel'
+                ])->withInput();
+            }
+        }
 
         DB::beginTransaction();
         try {
-            // Sauvegarder l'état avant modification pour l'audit
-            $originalData = $distributeur->toArray();
+            // Stocker les anciennes valeurs pour l'audit
+            $oldGrade = $distributeur->etoiles_id;
+            $oldParent = $distributeur->id_distrib_parent;
 
-            // Vérifications métier spécifiques
-            if (isset($validatedData['id_distrib_parent']) && $validatedData['id_distrib_parent'] != $distributeur->id_distrib_parent) {
-                // Changement de parent détecté - validation avancée
-                if ($validatedData['id_distrib_parent']) {
-                    $newParent = Distributeur::find($validatedData['id_distrib_parent']);
-                    if (!$newParent) {
-                        throw new \Exception('Le nouveau distributeur parent sélectionné n\'existe pas.');
-                    }
+            // Mise à jour du distributeur
+            $distributeur->nom_distributeur = $request->nom_distributeur;
+            $distributeur->pnom_distributeur = $request->pnom_distributeur;
+            $distributeur->tel_distributeur = $request->tel_distributeur;
+            $distributeur->adress_distributeur = $request->adress_distributeur;
+            $distributeur->etoiles_id = $request->etoiles_id;
+            $distributeur->rang = $request->rang ?? 0;
+            $distributeur->statut_validation_periode = $request->boolean('statut_validation_periode');
 
-                    // Vérifier qu'on ne crée pas de boucle
-                    if ($this->wouldCreateLoop($validatedData['id_distrib_parent'], $distributeur->id)) {
-                        throw new \Exception('Cette assignation créerait une boucle dans la hiérarchie.');
-                    }
+            // Gestion du changement de parent
+            if ($request->filled('id_distrib_parent') && $request->id_distrib_parent != $oldParent) {
+                // Vérifier que le nouveau parent n'est pas un descendant
+                if ($this->isDescendant($distributeur->id, $request->id_distrib_parent)) {
+                    return back()->withErrors([
+                        'id_distrib_parent' => 'Le nouveau parent ne peut pas être un descendant du distributeur'
+                    ])->withInput();
                 }
-
-                // Log du changement de parent (action sensible)
-                Log::warning("Changement de parent détecté", [
-                    'distributeur_id' => $distributeur->id,
-                    'ancien_parent' => $distributeur->id_distrib_parent,
-                    'nouveau_parent' => $validatedData['id_distrib_parent'],
-                    'user_id' => Auth::id()
-                ]);
+                $distributeur->id_distrib_parent = $request->id_distrib_parent;
             }
 
-            // Détection de changement de grade forcé
-            if (isset($validatedData['etoiles_id']) && $validatedData['etoiles_id'] != $distributeur->etoiles_id) {
-                Log::warning("Changement de grade forcé détecté", [
-                    'distributeur_id' => $distributeur->id,
-                    'ancien_grade' => $distributeur->etoiles_id,
-                    'nouveau_grade' => $validatedData['etoiles_id'],
-                    'user_id' => Auth::id()
-                ]);
+            $distributeur->save();
+
+            // Mise à jour des performances si fournies
+            if ($request->filled('cumul_individuel') || $request->filled('cumul_collectif')) {
+                $currentPeriod = Carbon::now()->format('Y-m');
+
+                $levelCurrent = LevelCurrent::where('distributeur_id', $distributeur->id)
+                                        ->where('period', $currentPeriod)
+                                        ->first();
+
+                if ($levelCurrent) {
+                    // Mise à jour des cumuls existants
+                    if ($request->filled('cumul_individuel')) {
+                        $levelCurrent->cumul_individuel = $request->cumul_individuel;
+                    }
+                    if ($request->filled('cumul_collectif')) {
+                        $levelCurrent->cumul_collectif = $request->cumul_collectif;
+                    }
+
+                    // Si le grade a changé, mettre à jour aussi dans level_currents
+                    if ($oldGrade != $request->etoiles_id) {
+                        $levelCurrent->etoiles = $request->etoiles_id;
+                    }
+
+                    $levelCurrent->save();
+
+                    // Log de l'ajustement
+                    Log::info("Ajustement des cumuls pour le distributeur", [
+                        'distributeur_id' => $distributeur->id,
+                        'matricule' => $distributeur->distributeur_id,
+                        'period' => $currentPeriod,
+                        'cumul_individuel' => $levelCurrent->cumul_individuel,
+                        'cumul_collectif' => $levelCurrent->cumul_collectif,
+                        'grade' => $levelCurrent->etoiles
+                    ]);
+                } else {
+                    // Créer un nouvel enregistrement si nécessaire
+                    $levelCurrent = new LevelCurrent();
+                    $levelCurrent->distributeur_id = $distributeur->id;
+                    $levelCurrent->period = $currentPeriod;
+                    $levelCurrent->rang = $distributeur->rang;
+                    $levelCurrent->etoiles = $distributeur->etoiles_id;
+                    $levelCurrent->cumul_individuel = $request->cumul_individuel ?? 0;
+                    $levelCurrent->new_cumul = 0;
+                    $levelCurrent->cumul_total = 0;
+                    $levelCurrent->cumul_collectif = $request->cumul_collectif ?? 0;
+                    $levelCurrent->id_distrib_parent = $distributeur->id_distrib_parent;
+                    $levelCurrent->save();
+                }
             }
 
-            // Mettre à jour
-            $distributeur->update($validatedData);
-
-            // Enregistrer l'audit des modifications
-            $this->logModificationAudit($distributeur, $originalData, $validatedData);
+            // Créer un enregistrement d'audit si le grade a changé
+            if ($oldGrade != $request->etoiles_id) {
+                AvancementHistory::create([
+                    'distributeur_id' => $distributeur->id,
+                    'period' => Carbon::now()->format('Y-m'),
+                    'ancien_grade' => $oldGrade,
+                    'nouveau_grade' => $request->etoiles_id,
+                    'type_calcul' => 'manual',
+                    'details' => [
+                        'user_id' => Auth::id(),
+                        'reason' => 'Modification manuelle via interface admin',
+                        'old_cumul_individuel' => $levelCurrent->getOriginal('cumul_individuel') ?? null,
+                        'new_cumul_individuel' => $levelCurrent->cumul_individuel ?? null,
+                        'old_cumul_collectif' => $levelCurrent->getOriginal('cumul_collectif') ?? null,
+                        'new_cumul_collectif' => $levelCurrent->cumul_collectif ?? null,
+                    ]
+                ]);
+            }
 
             DB::commit();
 
-            Log::info("Distributeur mis à jour", [
-                'id' => $distributeur->id,
-                'matricule' => $distributeur->distributeur_id,
-                'user_id' => Auth::id()
-            ]);
+            // Message de succès détaillé
+            $message = "Distributeur mis à jour avec succès.";
+            if ($oldGrade != $request->etoiles_id) {
+                $message .= " Le grade a été modifié de {$oldGrade} à {$request->etoiles_id}.";
+            }
+            if ($request->filled('cumul_individuel') || $request->filled('cumul_collectif')) {
+                $message .= " Les cumuls ont été ajustés.";
+            }
 
             return redirect()
                 ->route('admin.distributeurs.show', $distributeur)
-                ->with('success', 'Distributeur mis à jour avec succès.');
+                ->with('success', $message);
 
         } catch (\Exception $e) {
             DB::rollBack();
             Log::error("Erreur mise à jour distributeur", [
-                'id' => $distributeur->id,
                 'error' => $e->getMessage(),
-                'data' => $validatedData,
-                'user_id' => Auth::id()
+                'distributeur_id' => $distributeur->id,
+                'data' => $request->all()
             ]);
+
             return back()
-                ->withInput()
-                ->with('error', 'Erreur lors de la mise à jour: ' . $e->getMessage());
+                ->withErrors(['error' => 'Une erreur est survenue lors de la mise à jour.'])
+                ->withInput();
         }
+    }
+
+    /**
+     * Vérifie si un distributeur est descendant d'un autre
+     */
+    private function isDescendant($parentId, $potentialDescendantId)
+    {
+        if ($parentId == $potentialDescendantId) {
+            return true;
+        }
+
+        $children = Distributeur::where('id_distrib_parent', $parentId)->pluck('id');
+
+        foreach ($children as $childId) {
+            if ($this->isDescendant($childId, $potentialDescendantId)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
