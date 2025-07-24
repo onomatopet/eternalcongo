@@ -32,28 +32,31 @@ class Achat extends Model
     public $timestamps = true;
 
     protected $fillable = [
-        'period',
-        'distributeur_id',
-        'products_id',
-        'qt',
-        'points_unitaire_achat',
-        'montant_total_ligne',
-        'prix_unitaire_achat',
-        'online',
-    ];
+    'period',
+    'distributeur_id',
+    'products_id',
+    'qt',
+    'online',
+    'prix_unitaire_achat',
+    'points_unitaire_achat',
+    'montant_total_ligne',
+    'purchase_date', // NOUVEAU CHAMP
+];
 
-    protected $casts = [
-        'id' => 'integer',
-        'distributeur_id' => 'integer',
-        'products_id' => 'integer',
-        'qt' => 'integer',
-        'points_unitaire_achat' => 'decimal:2',
-        'montant_total_ligne' => 'decimal:2',
-        'prix_unitaire_achat' => 'decimal:2',
-        'online' => 'boolean',
-        'created_at' => 'datetime',
-        'updated_at' => 'datetime',
-    ];
+// Dans la propriété $casts, ajouter :
+protected $casts = [
+    'id' => 'integer',
+    'distributeur_id' => 'integer',
+    'products_id' => 'integer',
+    'qt' => 'integer',
+    'online' => 'boolean',
+    'prix_unitaire_achat' => 'decimal:2',
+    'points_unitaire_achat' => 'decimal:2',
+    'montant_total_ligne' => 'decimal:2',
+    'purchase_date' => 'date', // NOUVEAU CAST
+    'created_at' => 'datetime',
+    'updated_at' => 'datetime',
+];
 
     /**
      * Relation: Un Achat appartient à un Distributeur.

@@ -63,6 +63,10 @@
             @csrf
             @method('PUT')
 
+            {{-- CHAMPS CACHÉS IMPORTANTS --}}
+            <input type="hidden" name="distributeur_id" value="{{ $achat->distributeur_id }}">
+            <input type="hidden" name="products_id" value="{{ $achat->products_id }}">
+
             {{-- Sections côte à côte sur grand écran --}}
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 {{-- Section Informations de base --}}
@@ -92,6 +96,25 @@
                                 <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
                             @enderror
                             <p class="mt-1 text-xs text-gray-500">Format: YYYY-MM (ex: 2025-07)</p>
+                        </div>
+
+                        {{-- Date d'achat (NOUVEAU CHAMP) --}}
+                        <div>
+                            <label for="purchase_date" class="block text-sm font-medium text-gray-700 mb-2">
+                                Date d'achat <span class="text-red-500">*</span>
+                            </label>
+                            <input
+                                type="date"
+                                name="purchase_date"
+                                id="purchase_date"
+                                value="{{ old('purchase_date', isset($achat->purchase_date) ? $achat->purchase_date->format('Y-m-d') : $achat->created_at->format('Y-m-d')) }}"
+                                max="{{ date('Y-m-d') }}"
+                                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200 @error('purchase_date') border-red-500 @enderror"
+                                required>
+                            @error('purchase_date')
+                                <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
+                            @enderror
+                            <p class="mt-1 text-xs text-gray-500">Date réelle de l'achat</p>
                         </div>
 
                         {{-- Distributeur (non modifiable) --}}

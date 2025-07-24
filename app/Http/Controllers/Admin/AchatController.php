@@ -131,6 +131,7 @@ class AchatController extends Controller
             'products_id' => 'required|integer|exists:products,id',
             'qt' => 'required|integer|min:1',
             'online' => 'boolean',
+            'purchase_date' => 'required|date|before_or_equal:today', // NOUVEAU CHAMP
         ]);
 
         DB::beginTransaction();
@@ -255,6 +256,7 @@ class AchatController extends Controller
             'products_id' => 'required|integer|exists:products,id',
             'qt' => 'required|integer|min:1',
             'online' => 'boolean',
+            'purchase_date' => 'required|date|before_or_equal:today', // NOUVEAU CHAMP
         ]);
 
         DB::beginTransaction();
