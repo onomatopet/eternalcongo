@@ -9,6 +9,7 @@ use App\Services\BackupService;
 use App\Services\DeletionValidationService;
 use Illuminate\Http\Request;
 use App\Traits\HasPermissions;
+use App\Models\LevelCurrent;
 use Illuminate\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\JsonResponse;
@@ -16,6 +17,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Auth;
 use App\Services\CumulManagementService;
+use Carbon\Carbon;
 
 class DistributeurController extends Controller
 {
@@ -88,67 +90,103 @@ class DistributeurController extends Controller
     /**
      * Store a newly created resource in storage.
      */
-    public function store(Request $request): RedirectResponse
+    public function store(Request $request)
     {
         // Validation des données
         $validatedData = $request->validate([
-            'distributeur_id' => 'required|string|max:20|unique:distributeurs,distributeur_id',
-            'nom_distributeur' => 'required|string|max:100',
-            'pnom_distributeur' => 'required|string|max:100',
+            'distributeur_id' => 'required|unique:distributeurs,distributeur_id',
+            'nom_distributeur' => 'required|string|max:255',
+            'pnom_distributeur' => 'required|string|max:255',
             'tel_distributeur' => 'nullable|string|max:20',
             'adress_distributeur' => 'nullable|string|max:255',
-            'id_distrib_parent' => 'nullable|exists:distributeurs,id',
-            'etoiles_id' => 'nullable|integer|min:0|max:10',
-            'rang' => 'nullable|integer|min:0',
-            'statut_validation_periode' => 'nullable|boolean'
+            'id_parent' => 'nullable|exists:distributeurs,distributeur_id',
+            'etoiles_id' => 'nullable|integer|min:1|max:10',
+            'cumul_individuel' => 'nullable|numeric|min:0',
+            'cumul_collectif' => 'nullable|numeric|min:0',
         ]);
+
+        // Validation supplémentaire : cumul_collectif >= cumul_individuel
+        if ($request->filled('cumul_individuel') && $request->filled('cumul_collectif')) {
+            if ($request->cumul_collectif < $request->cumul_individuel) {
+                return back()->withErrors([
+                    'cumul_collectif' => 'Le cumul collectif doit être supérieur ou égal au cumul individuel'
+                ])->withInput();
+            }
+        }
 
         DB::beginTransaction();
         try {
-            // Vérifications métier spécifiques
-            if (isset($validatedData['id_distrib_parent'])) {
-                $parent = Distributeur::find($validatedData['id_distrib_parent']);
-                if (!$parent) {
-                    throw new \Exception('Le distributeur parent sélectionné n\'existe pas.');
-                }
-
-                // Vérifier qu'on ne crée pas de boucle dans la hiérarchie
-                if ($this->wouldCreateLoop($validatedData['id_distrib_parent'], null)) {
-                    throw new \Exception('Cette assignation créerait une boucle dans la hiérarchie.');
-                }
+            // Récupérer l'ID du parent si fourni
+            $parentId = null;
+            if ($request->filled('id_parent')) {
+                $parent = Distributeur::where('distributeur_id', $request->id_parent)->first();
+                $parentId = $parent ? $parent->id : null;
             }
 
-            // Valeurs par défaut
-            $validatedData['etoiles_id'] = $validatedData['etoiles_id'] ?? 1;
-            $validatedData['rang'] = $validatedData['rang'] ?? 0;
-            $validatedData['statut_validation_periode'] = $validatedData['statut_validation_periode'] ?? false;
-
             // Créer le distributeur
-            $distributeur = Distributeur::create($validatedData);
+            $distributeur = new Distributeur();
+            $distributeur->distributeur_id = $request->distributeur_id;
+            $distributeur->nom_distributeur = $request->nom_distributeur;
+            $distributeur->pnom_distributeur = $request->pnom_distributeur;
+            $distributeur->tel_distributeur = $request->tel_distributeur;
+            $distributeur->adress_distributeur = $request->adress_distributeur;
+            $distributeur->id_distrib_parent = $parentId;
+            $distributeur->etoiles_id = $request->etoiles_id ?? 1;
+            $distributeur->rang = 0; // Rang initial
+            $distributeur->save();
+
+            // Initialisation SYSTÉMATIQUE dans level_currents
+            $currentPeriod = Carbon::now()->format('Y-m');
+
+            // Vérifier si un enregistrement existe déjà pour cette période
+            $levelCurrent = LevelCurrent::where('distributeur_id', $distributeur->id)
+                                    ->where('period', $currentPeriod)
+                                    ->first();
+
+            if (!$levelCurrent) {
+                $levelCurrent = new LevelCurrent();
+                $levelCurrent->distributeur_id = $distributeur->id;
+                $levelCurrent->period = $currentPeriod;
+                $levelCurrent->rang = 0;
+                $levelCurrent->etoiles = $request->etoiles_id ?? 1;
+                $levelCurrent->cumul_individuel = $request->cumul_individuel ?? 0;
+                $levelCurrent->new_cumul = 0; // Toujours 0 pour la période courante au début
+                $levelCurrent->cumul_total = 0; // Toujours 0 pour la période courante au début
+                $levelCurrent->cumul_collectif = $request->cumul_collectif ?? 0;
+                $levelCurrent->id_distrib_parent = $parentId;
+                $levelCurrent->save();
+
+                Log::info("Level_current initialisé pour le distributeur", [
+                    'distributeur_id' => $distributeur->id,
+                    'matricule' => $distributeur->distributeur_id,
+                    'period' => $currentPeriod,
+                    'cumul_individuel' => $levelCurrent->cumul_individuel,
+                    'cumul_collectif' => $levelCurrent->cumul_collectif
+                ]);
+            }
 
             DB::commit();
 
-            Log::info("Nouveau distributeur créé", [
-                'id' => $distributeur->id,
-                'matricule' => $distributeur->distributeur_id,
-                'nom' => $distributeur->full_name,
-                'user_id' => Auth::id()
-            ]);
+            // Message de succès avec détails
+            $message = "Distributeur créé avec succès.";
+            if ($request->filled('cumul_individuel') || $request->filled('cumul_collectif')) {
+                $message .= " Les cumuls historiques ont été initialisés.";
+            }
 
             return redirect()
                 ->route('admin.distributeurs.show', $distributeur)
-                ->with('success', 'Distributeur créé avec succès. Matricule: ' . $distributeur->distributeur_id);
+                ->with('success', $message);
 
         } catch (\Exception $e) {
             DB::rollBack();
             Log::error("Erreur création distributeur", [
                 'error' => $e->getMessage(),
-                'data' => $validatedData,
-                'user_id' => Auth::id()
+                'data' => $request->all()
             ]);
+
             return back()
-                ->withInput()
-                ->with('error', 'Une erreur est survenue lors de la création du distributeur: ' . $e->getMessage());
+                ->withErrors(['error' => 'Une erreur est survenue lors de la création du distributeur.'])
+                ->withInput();
         }
     }
 

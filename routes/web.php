@@ -238,13 +238,19 @@ Route::middleware(['auth', 'verified', 'check_admin_role'])
 
         // ===== GESTION DES DEMANDES DE SUPPRESSION =====
         Route::prefix('deletion-requests')->name('deletion-requests.')->group(function () {
-            // IMPORTANT : La route 'backups' doit être AVANT la route '{deletionRequest}'
+            // IMPORTANT : Les routes spécifiques doivent être AVANT les routes avec paramètres
+
+            // Routes pour les backups (DOIT être avant {deletionRequest})
             Route::get('/backups', [DeletionRequestController::class, 'backups'])->name('backups');
             Route::post('/restore-backup', [DeletionRequestController::class, 'restoreBackup'])->name('restore-backup');
+
+            // Route d'export
             Route::get('/export', [DeletionRequestController::class, 'export'])->name('export');
 
-            // Routes générales
+            // Routes générales (index doit être avant show pour éviter les conflits)
             Route::get('/', [DeletionRequestController::class, 'index'])->name('index');
+
+            // Routes avec paramètres (doivent être en dernier)
             Route::get('/{deletionRequest}', [DeletionRequestController::class, 'show'])->name('show');
             Route::post('/{deletionRequest}/approve', [DeletionRequestController::class, 'approve'])->name('approve');
             Route::post('/{deletionRequest}/reject', [DeletionRequestController::class, 'reject'])->name('reject');

@@ -1,164 +1,238 @@
 <?php
 
-// Supposons que ce code est dans une méthode d'un Service, Contrôleur, ou Commande.
-// Assurez-vous d'avoir les 'use' statements nécessaires en haut du fichier:
 namespace App\Services;
+
 use App\Models\Achat;
-use App\Models\Level_current_test;
-use App\Models\Distributeur; // Si utilisé pour récupérer rang/etoiles par défaut
+use App\Models\LevelCurrent;
+use App\Models\Distributeur;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Carbon\Carbon;
 
 class AddCumulToDistrib
 {
-    public function processAchatsAndLevels(string $period) // La période est passée en argument
+    /**
+     * Traite les achats et met à jour les niveaux pour une période donnée
+     *
+     * IMPORTANT:
+     * - cumul_total = performance du réseau pour la période courante (se réinitialise chaque mois)
+     * - new_cumul = achats personnels de la période courante (se réinitialise chaque mois)
+     * - cumul_individuel = cumul historique des achats personnels (ne se réinitialise jamais)
+     * - cumul_collectif = cumul historique personnel + réseau (ne se réinitialise jamais)
+     */
+    public function processAchatsAndLevels(string $period)
     {
-        Log::info("Début du traitement des achats et mise à jour des niveaux pour la période: {$period}");
+        Log::info("Début du traitement des achats pour la période: {$period}");
 
-        // --- 1. Récupérer tous les achats agrégés pour la période ---
-        // selectRaw est bon. Le groupBy('distributeur_id') est incorrect si on veut aussi id_distrib_parent.
-        // Si id_distrib_parent est le même pour tous les achats d'un distributeur pour cette période, c'est ok.
-        // Sinon, il faut le retirer du selectRaw/groupBy ou utiliser MAX()/MIN() si on en a besoin pour la création.
-        // Ici, je vais supposer qu'on peut récupérer id_distrib_parent via le modèle Distributeur si besoin pour la création.
+        // 1. Récupérer tous les achats agrégés pour la période
         $achatsAgreges = Achat::selectRaw('distributeur_id, SUM(pointvaleur) as total_new_achats')
             ->where('period', $period)
             ->groupBy('distributeur_id')
-            ->havingRaw('SUM(pointvaleur) > 0') // Optionnel: Ne traiter que s'il y a des achats
+            ->havingRaw('SUM(pointvaleur) > 0')
             ->get()
-            ->keyBy('distributeur_id'); // Clé par distributeur_id pour accès facile
+            ->keyBy('distributeur_id');
 
         if ($achatsAgreges->isEmpty()) {
-            Log::info("Aucun achat trouvé pour la période {$period}. Traitement terminé.");
+            Log::info("Aucun achat trouvé pour la période {$period}.");
             return "Aucun achat à traiter pour la période {$period}.";
         }
-        Log::info("Achats agrégés récupérés pour {$achatsAgreges->count()} distributeurs.");
 
-        // --- 2. Récupérer tous les enregistrements Level_current_test existants pour la période ---
-        $existingLevels = Level_current_test::where('period', $period)
-            ->whereIn('distributeur_id', $achatsAgreges->keys()) // Ne charger que les distributeurs ayant des achats
+        // 2. Récupérer les enregistrements existants
+        $existingLevels = LevelCurrent::where('period', $period)
+            ->whereIn('distributeur_id', $achatsAgreges->keys())
             ->get()
-            ->keyBy('distributeur_id'); // Clé par distributeur_id
+            ->keyBy('distributeur_id');
 
-        Log::info("Niveaux existants récupérés pour {$existingLevels->count()} distributeurs pour la période {$period}.");
+        $updates = [];
+        $inserts = [];
+        $distributeursACreerIds = [];
 
-        $updates = []; // Pour les mises à jour groupées
-        $inserts = []; // Pour les insertions groupées
-        $distributeursACreerIds = []; // IDs des distributeurs pour lesquels il faut créer un Level_current_test
-
-        // --- 3. Préparer les mises à jour et les insertions ---
+        // 3. Préparer les mises à jour et insertions
         foreach ($achatsAgreges as $distribId => $achat) {
             $nouveauxAchats = (float) $achat->total_new_achats;
 
             if ($existingLevel = $existingLevels->get($distribId)) {
-                // CAS 1: Le Level_current_test existe -> MISE À JOUR
-                // Utiliser DB::raw pour les incrémentations atomiques
-                // Préparer un tableau pour un 'upsert' ou des 'update' individuels optimisés
+                // Mise à jour d'un enregistrement existant
                 $updates[] = [
-                    'distributeur_id' => $distribId, // Utilisé pour le where de l'update
-                    'period' => $period,            // Utilisé pour le where de l'update
+                    'distributeur_id' => $distribId,
+                    'period' => $period,
                     'cumul_individuel_increment' => $nouveauxAchats,
-                    'new_cumul_assign' => $nouveauxAchats,
-                    'cumul_total_increment' => $nouveauxAchats,
-                    'cumul_collectif_increment' => $nouveauxAchats, // Vérifiez cette logique
+                    'new_cumul_assign' => $nouveauxAchats, // Remplace la valeur existante
+                    'cumul_total_assign' => $nouveauxAchats, // Pour cette période, cumul_total = achats du mois
+                    'cumul_collectif_increment' => $nouveauxAchats,
                 ];
             } else {
-                // CAS 2: Le Level_current_test N'EXISTE PAS -> INSERTION
-                // Marquer pour récupération des infos du distributeur principal
+                // Nouvelle entrée à créer
                 $distributeursACreerIds[] = $distribId;
-                // Stocker les achats pour l'insertion plus tard
-                // $inserts attendra les infos de la table Distributeur
             }
         }
 
-        // --- 4. Récupérer les informations des distributeurs pour les nouvelles créations ---
+        // 4. Récupérer les infos pour les nouvelles créations
         $distributeursPourCreation = collect();
         if (!empty($distributeursACreerIds)) {
             $distributeursPourCreation = Distributeur::whereIn('distributeur_id', $distributeursACreerIds)
-                                                     ->select('distributeur_id', 'id_distrib_parent', 'rang') // Ajouter 'etoiles' si nécessaire
-                                                     ->get()
-                                                     ->keyBy('distributeur_id');
-            Log::info("Informations récupérées pour {$distributeursPourCreation->count()} nouveaux distributeurs à insérer dans Level_current_test.");
+                ->select('distributeur_id', 'id_distrib_parent', 'rang', 'etoiles_id')
+                ->get()
+                ->keyBy('distributeur_id');
         }
 
-        // --- 5. Finaliser les données pour l'insertion ---
+        // 5. Préparer les données d'insertion
         foreach ($distributeursACreerIds as $distribId) {
             $achatInfo = $achatsAgreges->get($distribId);
             $distribInfo = $distributeursPourCreation->get($distribId);
 
             if ($achatInfo && $distribInfo) {
                 $nouveauxAchats = (float) $achatInfo->total_new_achats;
+
+                // Pour une nouvelle période, on initialise avec les achats du mois
                 $inserts[] = [
                     'distributeur_id' => $distribId,
                     'period' => $period,
-                    'rang' => $distribInfo->rang ?? null, // Rang actuel du distributeur
-                    'etoiles' => 1, // Grade initial par défaut pour une nouvelle période
-                    'cumul_individuel' => $nouveauxAchats,
-                    'new_cumul' => $nouveauxAchats,
-                    'cumul_total' => $nouveauxAchats,
-                    'cumul_collectif' => $nouveauxAchats, // Initialisé avec les achats du distributeur lui-même
+                    'rang' => $distribInfo->rang ?? 0,
+                    'etoiles' => $distribInfo->etoiles_id ?? 1,
+                    'cumul_individuel' => $nouveauxAchats, // Premier achat = cumul individuel
+                    'new_cumul' => $nouveauxAchats, // Achats du mois
+                    'cumul_total' => $nouveauxAchats, // Performance réseau du mois = achats personnels au début
+                    'cumul_collectif' => $nouveauxAchats, // Cumul collectif = achats personnels au début
                     'id_distrib_parent' => $distribInfo->id_distrib_parent ?? null,
-                    'created_at' => Carbon::now(), // Utiliser Carbon::now() ou une date de période
-                    'updated_at' => Carbon::now(), // Si vos colonnes existent
+                    'created_at' => Carbon::now(),
+                    'updated_at' => Carbon::now(),
                 ];
-            } else {
-                Log::warning("Impossible de créer l'enregistrement Level_current_test pour distributeur_id {$distribId}: informations d'achat ou de distributeur manquantes.");
             }
         }
 
-        // --- 6. Exécuter les opérations sur la base de données ---
+        // 6. Exécuter les opérations
         $updatedCount = 0;
         $insertedCount = 0;
 
         try {
             DB::beginTransaction();
 
-            // Exécuter les mises à jour (plusieurs requêtes individuelles mais atomiques)
+            // Exécuter les mises à jour
             if (!empty($updates)) {
                 foreach ($updates as $updateData) {
-                    // Utiliser updateOrInsert est une option, mais pour des incréments,
-                    // il est souvent plus clair de faire un select puis update/insert séparément
-                    // ou de gérer les updates comme ci-dessous.
-                    $affectedRows = Level_current_test::where('distributeur_id', $updateData['distributeur_id'])
+                    $affectedRows = LevelCurrent::where('distributeur_id', $updateData['distributeur_id'])
                         ->where('period', $updateData['period'])
                         ->update([
                             'cumul_individuel' => DB::raw("cumul_individuel + " . $updateData['cumul_individuel_increment']),
                             'new_cumul' => $updateData['new_cumul_assign'], // Assignation directe
-                            'cumul_total' => DB::raw("cumul_total + " . $updateData['cumul_total_increment']),
+                            'cumul_total' => $updateData['cumul_total_assign'], // Assignation directe pour la période
                             'cumul_collectif' => DB::raw("cumul_collectif + " . $updateData['cumul_collectif_increment']),
                             'updated_at' => Carbon::now(),
                         ]);
+
                     if ($affectedRows > 0) {
                         $updatedCount++;
                     }
                 }
-                Log::info("Mises à jour effectuées pour {$updatedCount} enregistrements Level_current_test.");
             }
 
-            // Exécuter les insertions groupées
+            // Exécuter les insertions
             if (!empty($inserts)) {
-                // Level_current_test::insert($inserts); // Ne remplit pas created_at/updated_at automatiquement
-                // Préférer une boucle create si on veut les timestamps Eloquent et les événements,
-                // mais pour du bulk, 'insert' est plus rapide. Si created_at/updated_at sont définis manuellement, 'insert' est ok.
-                foreach (array_chunk($inserts, 500) as $chunk) { // Insérer par lots
-                    Level_current_test::insert($chunk);
+                foreach (array_chunk($inserts, 500) as $chunk) {
+                    LevelCurrent::insert($chunk);
                     $insertedCount += count($chunk);
                 }
-                Log::info("Insertions effectuées pour {$insertedCount} nouveaux enregistrements Level_current_test.");
             }
 
             DB::commit();
-            $message = "Traitement terminé pour la période {$period}. Mises à jour: {$updatedCount}, Insertions: {$insertedCount}.";
-            Log::info($message);
-            return $message;
+
+            Log::info("Traitement terminé pour {$period}. Mises à jour: {$updatedCount}, Insertions: {$insertedCount}");
+
+            return [
+                'success' => true,
+                'message' => "Traitement réussi pour la période {$period}",
+                'updated' => $updatedCount,
+                'inserted' => $insertedCount
+            ];
 
         } catch (\Exception $e) {
             DB::rollBack();
-            $errorMessage = "Erreur lors du traitement pour la période {$period}: " . $e->getMessage();
-            Log::error($errorMessage, ['exception' => $e]);
-            // Ne pas utiliser dd() dans un script de production ou une commande
-            // throw $e; // Relancer l'exception si on veut que la commande échoue
-            return "ERREUR: " . $errorMessage;
+            Log::error("Erreur traitement achats pour {$period}: " . $e->getMessage());
+
+            return [
+                'success' => false,
+                'message' => "Erreur lors du traitement: " . $e->getMessage()
+            ];
         }
+    }
+
+    /**
+     * Met à jour le cumul_total en calculant la performance du réseau
+     * Cette méthode devrait être appelée après le traitement des achats individuels
+     */
+    public function updateCumulTotalFromNetwork(string $period)
+    {
+        Log::info("Mise à jour du cumul_total (performance réseau) pour la période: {$period}");
+
+        try {
+            // Pour chaque distributeur ayant des données pour cette période
+            $distributeurs = LevelCurrent::where('period', $period)->get();
+
+            foreach ($distributeurs as $level) {
+                // Calculer la somme des new_cumul de tous les enfants directs et indirects
+                $networkPerformance = $this->calculateNetworkPerformance($level->distributeur_id, $period);
+
+                // cumul_total = performance personnelle (new_cumul) + performance du réseau
+                $cumulTotal = $level->new_cumul + $networkPerformance;
+
+                $level->update(['cumul_total' => $cumulTotal]);
+
+                Log::debug("Cumul_total mis à jour pour distributeur {$level->distributeur_id}: {$cumulTotal}");
+            }
+
+            return [
+                'success' => true,
+                'message' => "Cumul_total mis à jour pour tous les distributeurs de la période {$period}"
+            ];
+
+        } catch (\Exception $e) {
+            Log::error("Erreur mise à jour cumul_total: " . $e->getMessage());
+            return [
+                'success' => false,
+                'message' => "Erreur: " . $e->getMessage()
+            ];
+        }
+    }
+
+    /**
+     * Calcule la performance du réseau d'un distributeur pour une période
+     */
+    private function calculateNetworkPerformance($distributeurId, $period)
+    {
+        // Récupérer tous les enfants (directs et indirects)
+        $childrenIds = $this->getAllChildrenIds($distributeurId);
+
+        if (empty($childrenIds)) {
+            return 0;
+        }
+
+        // Sommer les new_cumul de tous les enfants pour cette période
+        return LevelCurrent::where('period', $period)
+            ->whereIn('distributeur_id', $childrenIds)
+            ->sum('new_cumul');
+    }
+
+    /**
+     * Récupère récursivement tous les IDs des enfants d'un distributeur
+     */
+    private function getAllChildrenIds($distributeurId)
+    {
+        $allChildrenIds = [];
+
+        // Récupérer les enfants directs
+        $directChildren = Distributeur::where('id_distrib_parent', $distributeurId)
+            ->pluck('id')
+            ->toArray();
+
+        $allChildrenIds = array_merge($allChildrenIds, $directChildren);
+
+        // Récursion pour les enfants des enfants
+        foreach ($directChildren as $childId) {
+            $grandChildrenIds = $this->getAllChildrenIds($childId);
+            $allChildrenIds = array_merge($allChildrenIds, $grandChildrenIds);
+        }
+
+        return array_unique($allChildrenIds);
     }
 }
