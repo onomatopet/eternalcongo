@@ -13,6 +13,7 @@ use App\Http\Controllers\Admin\AdminSnapshotController;
 use App\Http\Controllers\Admin\DeletionRequestController;
 use App\Http\Controllers\Admin\ModificationRequestController;
 use App\Http\Controllers\Admin\AchatReturnController;
+use App\Http\Controllers\Admin\NetworkExportController;
 use App\Models\DeletionRequest;
 use App\Models\Distributeur;
 use App\Services\DeletionValidationService;
@@ -240,15 +241,11 @@ Route::middleware(['auth', 'verified', 'check_admin_role'])
         Route::prefix('deletion-requests')->name('deletion-requests.')->group(function () {
             // IMPORTANT : Les routes spécifiques doivent être AVANT les routes avec paramètres
 
-            // Routes pour les backups (DOIT être avant {deletionRequest})
-            Route::get('/backups', [DeletionRequestController::class, 'backups'])->name('backups');
-            Route::post('/restore-backup', [DeletionRequestController::class, 'restoreBackup'])->name('restore-backup');
-
-            // Route d'export
-            Route::get('/export', [DeletionRequestController::class, 'export'])->name('export');
-
-            // Routes générales (index doit être avant show pour éviter les conflits)
+            // Routes sans paramètres (doivent être en premier)
             Route::get('/', [DeletionRequestController::class, 'index'])->name('index');
+            Route::get('/backups', [DeletionRequestController::class, 'backups'])->name('backups');
+            Route::get('/export', [DeletionRequestController::class, 'export'])->name('export');
+            Route::post('/restore-backup', [DeletionRequestController::class, 'restoreBackup'])->name('restore-backup');
 
             // Routes avec paramètres (doivent être en dernier)
             Route::get('/{deletionRequest}', [DeletionRequestController::class, 'show'])->name('show');
@@ -279,6 +276,16 @@ Route::middleware(['auth', 'verified', 'check_admin_role'])
             // Validation AJAX
             Route::post('/validate', [ModificationRequestController::class, 'validateChange'])->name('validate');
         });
+
+        // ===== GESTION DU RÉSEAU DISTRIBUTEUR =====
+        Route::prefix('network')->name('network.')->group(function () {
+            Route::get('/', [NetworkExportController::class, 'index'])->name('index');
+            Route::get('/search-distributeurs', [NetworkExportController::class, 'searchDistributeurs'])->name('search.distributeurs');
+            Route::get('/export', [NetworkExportController::class, 'export'])->name('export');
+            Route::post('/export-pdf', [NetworkExportController::class, 'exportPdf'])->name('export.pdf');
+            Route::post('/export-excel', [NetworkExportController::class, 'exportExcel'])->name('export.excel');
+        });
+
     });
 
 // ===== ROUTES POUR DISTRIBUTEURS CONNECTÉS (Phase 3) =====
