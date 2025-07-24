@@ -1,19 +1,21 @@
 <?php
 
 use App\Http\Controllers\ProfileController;
-use App\Http\Controllers\Admin\AchatController;
-use App\Http\Controllers\Admin\AchatReturnController;
+use Illuminate\Support\Facades\Route;
+
+// Controllers Admin
 use App\Http\Controllers\Admin\DistributeurController;
-use App\Http\Controllers\Admin\ProcessController;
+use App\Http\Controllers\Admin\AchatController;
 use App\Http\Controllers\Admin\ProductController;
 use App\Http\Controllers\Admin\BonusController;
+use App\Http\Controllers\Admin\ProcessController;
+use App\Http\Controllers\Admin\AdminSnapshotController;
 use App\Http\Controllers\Admin\DeletionRequestController;
 use App\Http\Controllers\Admin\ModificationRequestController;
-use App\Http\Controllers\Admin\AdminSnapshotController;
+use App\Http\Controllers\Admin\AchatReturnController;
 use App\Models\DeletionRequest;
 use App\Models\Distributeur;
 use App\Services\DeletionValidationService;
-use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Http\Request;
 
@@ -236,15 +238,18 @@ Route::middleware(['auth', 'verified', 'check_admin_role'])
 
         // ===== GESTION DES DEMANDES DE SUPPRESSION =====
         Route::prefix('deletion-requests')->name('deletion-requests.')->group(function () {
+            // IMPORTANT : La route 'backups' doit être AVANT la route '{deletionRequest}'
+            Route::get('/backups', [DeletionRequestController::class, 'backups'])->name('backups');
+            Route::post('/restore-backup', [DeletionRequestController::class, 'restoreBackup'])->name('restore-backup');
+            Route::get('/export', [DeletionRequestController::class, 'export'])->name('export');
+
+            // Routes générales
             Route::get('/', [DeletionRequestController::class, 'index'])->name('index');
             Route::get('/{deletionRequest}', [DeletionRequestController::class, 'show'])->name('show');
             Route::post('/{deletionRequest}/approve', [DeletionRequestController::class, 'approve'])->name('approve');
             Route::post('/{deletionRequest}/reject', [DeletionRequestController::class, 'reject'])->name('reject');
             Route::post('/{deletionRequest}/execute', [DeletionRequestController::class, 'execute'])->name('execute');
             Route::post('/{deletionRequest}/cancel', [DeletionRequestController::class, 'cancel'])->name('cancel');
-            Route::get('/backups', [DeletionRequestController::class, 'backups'])->name('backups');
-            Route::post('/restore-backup', [DeletionRequestController::class, 'restoreBackup'])->name('restore-backup');
-            Route::get('/export', [DeletionRequestController::class, 'export'])->name('export');
         });
 
         // ===== GESTION DES DEMANDES DE MODIFICATION =====
