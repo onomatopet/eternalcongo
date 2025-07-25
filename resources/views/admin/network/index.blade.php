@@ -122,98 +122,68 @@
                             </div>
                             <div class="ml-4">
                                 <h2 class="text-xl font-semibold text-white">Étape 2 : Choisir la période</h2>
-                                <p class="text-green-100 text-sm">Sélectionnez le mois pour l'export</p>
+                                <p class="text-green-100 text-sm">Saisissez la période au format AAAA-MM</p>
                             </div>
                         </div>
                     </div>
 
                     <div class="p-6">
-                        <label class="block text-sm font-medium text-gray-700 mb-2">
-                            Sélectionnez une période :
-                        </label>
+                        {{-- Champ de recherche de période avec autocomplétion --}}
+                        <div class="relative" x-data="periodSearch()">
+                            <label for="period-input" class="block text-sm font-medium text-gray-700 mb-2">
+                                Période (format: AAAA-MM) :
+                            </label>
 
-                        {{-- Liste déroulante searchable avec Alpine.js et recherche DB --}}
-                        <div x-data="periodSelector()" class="relative">
                             <div class="relative">
-                                {{-- Input de recherche qui affiche la sélection --}}
                                 <input type="text"
-                                       x-model="search"
-                                       @click="openDropdown()"
-                                       @input="searchPeriods()"
-                                       @keydown.escape="open = false"
+                                       id="period-input"
+                                       name="period"
+                                       x-model="periodValue"
+                                       @input="searchPeriods"
+                                       @focus="showSuggestions = true"
+                                       @keydown.escape="showSuggestions = false"
                                        class="w-full px-4 py-3 pr-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                                       placeholder="Tapez pour rechercher une période..."
+                                       placeholder="Ex: 2025-06"
+                                       pattern="\d{4}-\d{2}"
+                                       maxlength="7"
                                        autocomplete="off">
 
-                                {{-- Icône dropdown --}}
-                                <button type="button"
-                                        @click="toggleDropdown()"
-                                        class="absolute inset-y-0 right-0 flex items-center pr-3">
-                                    <svg class="w-5 h-5 text-gray-400" :class="{'rotate-180': open}"
-                                         fill="none" stroke="currentColor" viewBox="0 0 24 24"
-                                         style="transition: transform 0.2s;">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                                {{-- Icône calendrier --}}
+                                <div class="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                                    <svg class="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
                                     </svg>
-                                </button>
-
-                                {{-- Input hidden pour le formulaire --}}
-                                <input type="hidden" name="period" :value="selectedValue">
+                                </div>
                             </div>
 
-                            {{-- Liste déroulante --}}
-                            <div x-show="open"
-                                 @click.away="open = false"
-                                 x-transition:enter="transition ease-out duration-200"
-                                 x-transition:enter-start="opacity-0 scale-95"
-                                 x-transition:enter-end="opacity-100 scale-100"
-                                 x-transition:leave="transition ease-in duration-150"
-                                 x-transition:leave-start="opacity-100 scale-100"
-                                 x-transition:leave-end="opacity-0 scale-95"
-                                 class="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-auto"
-                                 style="display: none;">
+                            {{-- Liste des suggestions --}}
+                            <div x-show="showSuggestions && suggestions.length > 0"
+                                 x-transition
+                                 @click.away="showSuggestions = false"
+                                 class="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-48 overflow-auto">
 
-                                {{-- Loader pendant la recherche --}}
-                                <div x-show="loading" class="p-4 text-center">
-                                    <svg class="animate-spin h-5 w-5 mx-auto text-gray-400" fill="none" viewBox="0 0 24 24">
+                                <div x-show="loading" class="p-3 text-center text-gray-500">
+                                    <svg class="animate-spin h-5 w-5 mx-auto" fill="none" viewBox="0 0 24 24">
                                         <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                                         <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
                                     </svg>
-                                    <p class="mt-2 text-sm text-gray-500">Recherche en cours...</p>
                                 </div>
 
-                                {{-- Résultats --}}
-                                <div x-show="!loading">
-                                    <template x-for="(yearGroup, year) in filteredPeriods" :key="year">
-                                        <div>
-                                            {{-- En-tête de l'année --}}
-                                            <div class="px-3 py-2 text-xs font-semibold text-gray-500 bg-gray-50 sticky top-0"
-                                                 x-text="year"></div>
-
-                                            {{-- Mois de l'année --}}
-                                            <template x-for="period in yearGroup" :key="period.value">
-                                                <button type="button"
-                                                        @click="selectPeriod(period)"
-                                                        class="w-full px-4 py-2 text-left hover:bg-blue-50 focus:bg-blue-50 focus:outline-none"
-                                                        :class="{'bg-blue-100': selectedValue === period.value}">
-                                                    <span x-text="period.label" class="block text-sm text-gray-900"></span>
-                                                    <span x-text="period.value" class="block text-xs text-gray-500"></span>
-                                                </button>
-                                            </template>
-                                        </div>
-                                    </template>
-
-                                    {{-- Message si aucun résultat --}}
-                                    <div x-show="Object.keys(filteredPeriods).length === 0 && !loading"
-                                         class="px-4 py-3 text-sm text-gray-500 text-center">
-                                        Aucune période trouvée dans la base de données
-                                    </div>
-                                </div>
+                                <template x-for="period in suggestions" :key="period.value">
+                                    <button type="button"
+                                            @click="selectPeriod(period)"
+                                            class="w-full px-4 py-2 text-left hover:bg-blue-50 focus:bg-blue-50 focus:outline-none transition-colors duration-150">
+                                        <div class="font-medium text-gray-900" x-text="period.value"></div>
+                                        <div class="text-sm text-gray-500" x-text="period.label"></div>
+                                    </button>
+                                </template>
                             </div>
-                        </div>
 
-                        <p class="mt-2 text-sm text-gray-500">
-                            Les périodes affichées sont celles qui contiennent des données dans la base
-                        </p>
+                            {{-- Message d'aide --}}
+                            <p class="mt-2 text-sm text-gray-500">
+                                Saisissez une période existante ou commencez à taper pour voir les suggestions
+                            </p>
+                        </div>
                     </div>
                 </div>
 
@@ -415,51 +385,102 @@
         checkFormValidity();
     }
 
-    // Gestion de la sélection de période
-    document.querySelectorAll('.period-radio').forEach(radio => {
-        radio.addEventListener('change', function() {
-            // Désélectionner l'autre select si une période est choisie
-            document.getElementById('other_periods').value = '';
-            checkFormValidity();
-        });
-    });
-
-    // Gestion du select "Autres périodes"
-    document.getElementById('other_periods').addEventListener('change', function() {
-        if (this.value) {
-            // Désélectionner toutes les radios
-            document.querySelectorAll('.period-radio').forEach(radio => {
-                radio.checked = false;
-            });
-            // Créer un input hidden pour la période
-            let hiddenInput = document.getElementById('hidden_period');
-            if (!hiddenInput) {
-                hiddenInput = document.createElement('input');
-                hiddenInput.type = 'hidden';
-                hiddenInput.name = 'period';
-                hiddenInput.id = 'hidden_period';
-                this.parentNode.appendChild(hiddenInput);
-            }
-            hiddenInput.value = this.value;
-        }
-        checkFormValidity();
-    });
-
-    // Vérifier la validité du formulaire
-    function checkFormValidity() {
+    // Fonction globale pour vérifier la validité du formulaire
+    window.checkFormValidity = function() {
         const hasDistributeur = distributeurIdInput.value !== '';
-        const hasPeriod = document.querySelector('input[name="period"]:checked') ||
-                         document.getElementById('other_periods').value !== '';
+        const periodInput = document.getElementById('period-input');
+        const hasPeriod = periodInput && periodInput.value.match(/^\d{4}-\d{2}$/);
+
+        console.log('Validation:', { hasDistributeur, hasPeriod, periodValue: periodInput?.value });
 
         if (hasDistributeur && hasPeriod) {
             submitButton.disabled = false;
+            submitButton.classList.remove('from-gray-400', 'to-gray-500', 'cursor-not-allowed');
+            submitButton.classList.add('from-blue-600', 'to-indigo-600', 'hover:from-blue-700', 'hover:to-indigo-700');
             buttonText.textContent = 'Générer l\'aperçu du réseau';
         } else {
             submitButton.disabled = true;
+            submitButton.classList.add('from-gray-400', 'to-gray-500', 'cursor-not-allowed');
+            submitButton.classList.remove('from-blue-600', 'to-indigo-600', 'hover:from-blue-700', 'hover:to-indigo-700');
+
             if (!hasDistributeur) {
                 buttonText.textContent = 'Sélectionnez d\'abord un distributeur';
             } else {
-                buttonText.textContent = 'Sélectionnez une période';
+                buttonText.textContent = 'Sélectionnez une période valide (AAAA-MM)';
+            }
+        }
+    }
+
+    // Fonction Alpine.js pour la recherche de période
+    function periodSearch() {
+        return {
+            periodValue: '',
+            suggestions: [],
+            showSuggestions: false,
+            loading: false,
+            searchTimeout: null,
+
+            init() {
+                // Écouter les changements pour la validation du formulaire
+                this.$watch('periodValue', (value) => {
+                    console.log('Period value changed:', value);
+                    // Appeler la fonction globale
+                    window.checkFormValidity();
+                });
+            },
+
+            searchPeriods() {
+                clearTimeout(this.searchTimeout);
+
+                // Ne chercher que si on a au moins 3 caractères
+                if (this.periodValue.length < 3) {
+                    this.suggestions = [];
+                    this.showSuggestions = false;
+                    return;
+                }
+
+                this.searchTimeout = setTimeout(() => {
+                    this.loading = true;
+                    this.showSuggestions = true;
+
+                    console.log('Searching periods for:', this.periodValue);
+
+                    fetch(`{{ route("admin.network.search.periods") }}?q=${encodeURIComponent(this.periodValue)}`)
+                        .then(response => {
+                            if (!response.ok) {
+                                throw new Error('Network response was not ok');
+                            }
+                            return response.json();
+                        })
+                        .then(data => {
+                            console.log('Periods found:', data);
+                            this.suggestions = [];
+
+                            // Aplatir les résultats groupés par année
+                            Object.entries(data).forEach(([year, periods]) => {
+                                periods.forEach(period => {
+                                    this.suggestions.push(period);
+                                });
+                            });
+
+                            this.loading = false;
+                        })
+                        .catch(error => {
+                            console.error('Erreur lors de la recherche des périodes:', error);
+                            this.loading = false;
+                            this.suggestions = [];
+                        });
+                }, 300);
+            },
+
+            selectPeriod(period) {
+                console.log('Period selected:', period);
+                this.periodValue = period.value;
+                this.showSuggestions = false;
+                // Forcer la mise à jour de la validation
+                this.$nextTick(() => {
+                    window.checkFormValidity();
+                });
             }
         }
     }
@@ -488,6 +509,11 @@
             </svg>
             <span>Génération en cours...</span>
         `;
+    });
+
+    // Vérifier la validité au chargement de la page
+    document.addEventListener('DOMContentLoaded', function() {
+        checkFormValidity();
     });
 </script>
 @endpush
