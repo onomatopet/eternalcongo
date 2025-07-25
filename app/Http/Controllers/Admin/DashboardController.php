@@ -19,7 +19,9 @@ class DashboardController extends Controller
             'total_distributeurs' => Distributeur::count(),
             'active_distributeurs' => Distributeur::where('created_at', '>=', now()->subDays(30))->count(),
             'total_achats' => Achat::whereMonth('created_at', now()->month)->count(),
-            'revenue_month' => Achat::whereMonth('created_at', now()->month)->sum('point_achat'),
+            // CORRECTION ICI : Utiliser points_unitaire_achat au lieu de point_achat
+            'revenue_month' => Achat::whereMonth('created_at', now()->month)
+                ->sum(DB::raw('points_unitaire_achat * qt')),
             'pending_modifications' => ModificationRequest::pending()->count(),
             'pending_deletions' => DeletionRequest::pending()->count(),
         ];
@@ -46,7 +48,8 @@ class DashboardController extends Controller
 
     private function getMonthlyRevenue()
     {
-        return Achat::selectRaw('MONTH(created_at) as month, SUM(point_achat) as total')
+        // CORRECTION ICI : Utiliser points_unitaire_achat * qt au lieu de point_achat
+        return Achat::selectRaw('MONTH(created_at) as month, SUM(points_unitaire_achat * qt) as total')
             ->whereYear('created_at', now()->year)
             ->groupBy('month')
             ->orderBy('month')
@@ -55,8 +58,10 @@ class DashboardController extends Controller
 
     private function getTopDistributeurs()
     {
-        return Distributeur::withSum('achats', 'point_achat')
-            ->orderByDesc('achats_sum_point_achat')
+        // CORRECTION ICI : Utiliser une sous-requête avec les bonnes colonnes
+        return Distributeur::select('distributeurs.*')
+            ->selectRaw('(SELECT SUM(points_unitaire_achat * qt) FROM achats WHERE achats.distributeur_id = distributeurs.id) as total_points')
+            ->orderByDesc('total_points')
             ->limit(10)
             ->get();
     }
@@ -88,5 +93,29 @@ class DashboardController extends Controller
     {
         // Statistiques des bonus
         return [];
+    }
+
+    // Méthodes API pour les routes AJAX
+    public function apiStats()
+    {
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'total_distributeurs' => Distributeur::count(),
+                'active_distributeurs' => Distributeur::where('created_at', '>=', now()->subDays(30))->count(),
+                'total_achats' => Achat::whereMonth('created_at', now()->month)->count(),
+                // CORRECTION ICI AUSSI
+                'revenue_month' => Achat::whereMonth('created_at', now()->month)
+                    ->sum(DB::raw('points_unitaire_achat * qt')),
+            ]
+        ]);
+    }
+
+    public function apiNotifications()
+    {
+        return response()->json([
+            'success' => true,
+            'notifications' => []
+        ]);
     }
 }

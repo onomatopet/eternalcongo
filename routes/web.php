@@ -106,7 +106,7 @@ Route::middleware(['auth', 'verified', 'check_admin_role'])
     ->name('admin.')
     ->group(function () {
 
-        // Dashboard principal admin
+        // Dashboard principal - simplifié
         Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
 
         // ===== DASHBOARD ET MONITORING =====
@@ -176,8 +176,6 @@ Route::middleware(['auth', 'verified', 'check_admin_role'])
             Route::get('/{bonus}/edit', [BonusController::class, 'edit'])->name('edit');
             Route::put('/{bonus}', [BonusController::class, 'update'])->name('update');
             Route::delete('/{bonus}', [BonusController::class, 'destroy'])->name('destroy');
-
-            // Routes spécifiques bonus
             Route::get('/{bonus}/pdf', [BonusController::class, 'generatePdf'])->name('pdf');
             Route::get('/calculate/{period}', [BonusController::class, 'showCalculation'])->name('calculate.show');
             Route::post('/calculate/{period}', [BonusController::class, 'calculate'])->name('calculate');
@@ -237,9 +235,6 @@ Route::middleware(['auth', 'verified', 'check_admin_role'])
 
             Route::get('/create/grade-change/{distributeur}', [ModificationRequestController::class, 'createGradeChange'])->name('create.grade-change');
             Route::post('/store/grade-change/{distributeur}', [ModificationRequestController::class, 'storeGradeChange'])->name('store.grade-change');
-
-            Route::get('/create/cumul-adjustment/{levelCurrent}', [ModificationRequestController::class, 'createCumulAdjustment'])->name('create.cumul-adjustment');
-            Route::post('/store/cumul-adjustment/{levelCurrent}', [ModificationRequestController::class, 'storeCumulAdjustment'])->name('store.cumul-adjustment');
 
             // Actions sur les demandes
             Route::post('/{modificationRequest}/approve', [ModificationRequestController::class, 'approve'])->name('approve');
