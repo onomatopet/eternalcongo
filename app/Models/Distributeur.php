@@ -6,42 +6,37 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-// Si les distributeurs peuvent se connecter :
-// use Illuminate\Foundation\Auth\User as Authenticatable;
-// class Distributeur extends Authenticatable
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
-class Distributeur extends Model // Ou extends Authenticatable
+class Distributeur extends Model
 {
-    use HasFactory; // Ajoutez Notifiable si besoin: use HasFactory, Notifiable;
+    use HasFactory;
 
     protected $table = 'distributeurs';
     public $timestamps = true;
 
     protected $fillable = [
-    'distributeur_id',
-    'nom_distributeur',
-    'pnom_distributeur',
-    'tel_distributeur',
-    'adress_distributeur',
-    'id_distrib_parent',
-    'etoiles_id',
-    'rang',
-    'statut_validation_periode', // Ajoutez cette ligne
-    'is_indivual_cumul_checked',
-];
+        'distributeur_id',
+        'nom_distributeur',
+        'pnom_distributeur',
+        'tel_distributeur',
+        'adress_distributeur',
+        'id_distrib_parent',
+        'etoiles_id',
+        'rang',
+        'statut_validation_periode',
+        'is_indivual_cumul_checked',
+    ];
 
-protected $casts = [
-    'etoiles_id' => 'integer',
-    'rang' => 'integer',
-    'id_distrib_parent' => 'integer',
-    'statut_validation_periode' => 'boolean', // Ajoutez cette ligne
-    'is_indivual_cumul_checked' => 'boolean',
-    'created_at' => 'datetime',
-    'updated_at' => 'datetime',
-];
-
-    // Si les distributeurs se connectent, ajouter :
-    // protected $hidden = ['password', 'remember_token'];
+    protected $casts = [
+        'etoiles_id' => 'integer',
+        'rang' => 'integer',
+        'id_distrib_parent' => 'integer',
+        'statut_validation_periode' => 'boolean',
+        'is_indivual_cumul_checked' => 'boolean',
+        'created_at' => 'datetime',
+        'updated_at' => 'datetime',
+    ];
 
     // --- Relations ---
 
@@ -50,7 +45,6 @@ protected $casts = [
      */
     public function parent(): BelongsTo
     {
-        // Référence la clé 'id_distrib_parent' de cette table vers la clé 'id' de cette même table
         return $this->belongsTo(Distributeur::class, 'id_distrib_parent', 'id');
     }
 
@@ -59,8 +53,15 @@ protected $casts = [
      */
     public function children(): HasMany
     {
-        // Référence la clé 'id' de cette table vers la clé 'id_distrib_parent' de cette même table
         return $this->hasMany(Distributeur::class, 'id_distrib_parent', 'id');
+    }
+
+    /**
+     * Alias pour children() - pour compatibilité avec le code existant
+     */
+    public function filleuls(): HasMany
+    {
+        return $this->children();
     }
 
     /**
@@ -72,12 +73,31 @@ protected $casts = [
     }
 
     /**
-     * Relation: Un Distributeur a plusieurs entrées de niveau actuelles (normalement une seule par période).
+     * Relation: Un Distributeur a plusieurs entrées de niveau (toutes périodes confondues).
      */
     public function levelCurrents(): HasMany
     {
-        // Assurez-vous que le modèle LevelCurrent existe
         return $this->hasMany(LevelCurrent::class, 'distributeur_id', 'id');
+    }
+
+    /**
+     * Relation: Un Distributeur a UNE entrée de niveau pour la période courante.
+     * Utilisé pour accéder facilement au niveau actuel.
+     */
+    public function levelCurrent(): HasOne
+    {
+        $currentPeriod = date('Y-m');
+        return $this->hasOne(LevelCurrent::class, 'distributeur_id', 'id')
+                    ->where('period', $currentPeriod);
+    }
+
+    /**
+     * Relation: Pour une période spécifique
+     */
+    public function levelCurrentForPeriod(string $period): HasOne
+    {
+        return $this->hasOne(LevelCurrent::class, 'distributeur_id', 'id')
+                    ->where('period', $period);
     }
 
     /**
@@ -85,7 +105,6 @@ protected $casts = [
      */
     public function levelHistories(): HasMany
     {
-         // Assurez-vous que le modèle LevelCurrentHistory existe
         return $this->hasMany(LevelCurrentHistory::class, 'distributeur_id', 'id');
     }
 
@@ -94,20 +113,8 @@ protected $casts = [
      */
     public function bonuses(): HasMany
     {
-         // Assurez-vous que le modèle Bonus existe
         return $this->hasMany(Bonus::class, 'distributeur_id', 'id');
     }
-
-    // --- Accesseurs (Optionnel) ---
-    /**
-     * Obtient le nom complet du distributeur.
-     */
-    public function getFullNameAttribute(): string
-    {
-        return trim("{$this->pnom_distributeur} {$this->nom_distributeur}");
-    }
-
-    // À ajouter dans app/Models/Distributeur.php dans la section des relations
 
     /**
      * Relation: Un Distributeur a plusieurs enregistrements d'historique d'avancement.
@@ -117,12 +124,57 @@ protected $casts = [
         return $this->hasMany(AvancementHistory::class, 'distributeur_id', 'id');
     }
 
+    // --- Accesseurs ---
+
+    /**
+     * Obtient le nom complet du distributeur.
+     */
+    public function getFullNameAttribute(): string
+    {
+        return trim("{$this->pnom_distributeur} {$this->nom_distributeur}");
+    }
+
+    /**
+     * Obtient le grade actuel (alias pour etoiles_id)
+     */
+    public function getGradeAttribute(): int
+    {
+        return $this->etoiles_id ?? 1;
+    }
+
+    /**
+     * Obtient le niveau actuel depuis la relation levelCurrent
+     * Retourne null si aucun niveau pour la période courante
+     */
+    public function getCurrentLevelAttribute(): ?LevelCurrent
+    {
+        return $this->levelCurrent;
+    }
+
+    /**
+     * Obtient le cumul individuel de la période courante
+     */
+    public function getCumulIndividuelAttribute(): float
+    {
+        return $this->levelCurrent?->cumul_individuel ?? 0;
+    }
+
+    /**
+     * Obtient le cumul collectif de la période courante
+     */
+    public function getCumulCollectifAttribute(): float
+    {
+        return $this->levelCurrent?->cumul_collectif ?? 0;
+    }
+
+    // --- Méthodes utilitaires ---
+
     /**
      * Récupère les avancements pour une période spécifique
      */
     public function getAvancementsForPeriod(string $period)
     {
-        return $this->avancementHistory()->forPeriod($period);
+        return $this->avancementHistory()->forPeriod($period)->get();
     }
 
     /**
@@ -131,5 +183,71 @@ protected $casts = [
     public function getLastAdvancement()
     {
         return $this->avancementHistory()->latest('date_avancement')->first();
+    }
+
+    /**
+     * Vérifie si le distributeur a des enfants
+     */
+    public function hasChildren(): bool
+    {
+        return $this->children()->exists();
+    }
+
+    /**
+     * Compte le nombre total de descendants (récursif)
+     */
+    public function getTotalDescendantsCount(): int
+    {
+        $count = 0;
+        $children = $this->children;
+
+        foreach ($children as $child) {
+            $count++;
+            $count += $child->getTotalDescendantsCount();
+        }
+
+        return $count;
+    }
+
+    /**
+     * Récupère le niveau pour une période spécifique
+     */
+    public function getLevelForPeriod(string $period): ?LevelCurrent
+    {
+        return $this->levelCurrents()->where('period', $period)->first();
+    }
+
+    /**
+     * Vérifie si le distributeur est actif pour une période
+     */
+    public function isActiveForPeriod(string $period): bool
+    {
+        return $this->achats()->where('period', $period)->exists();
+    }
+
+    /**
+     * Scope pour filtrer les distributeurs actifs
+     */
+    public function scopeActive($query)
+    {
+        return $query->where('statut_validation_periode', true);
+    }
+
+    /**
+     * Scope pour filtrer par grade
+     */
+    public function scopeByGrade($query, int $grade)
+    {
+        return $query->where('etoiles_id', $grade);
+    }
+
+    /**
+     * Scope pour filtrer par période avec level_current
+     */
+    public function scopeWithLevelForPeriod($query, string $period)
+    {
+        return $query->with(['levelCurrents' => function($q) use ($period) {
+            $q->where('period', $period);
+        }]);
     }
 }

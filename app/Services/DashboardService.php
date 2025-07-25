@@ -26,7 +26,7 @@ class DashboardService
     /**
      * Récupère toutes les données du dashboard principal
      */
-    public function getDashboardData(?string $period = null): array  // Paramètre explicitement nullable
+    public function getDashboardData(?string $period = null): array
     {
         $period = $period ?? SystemPeriod::getCurrentPeriod()?->period ?? date('Y-m');
 
@@ -94,6 +94,7 @@ class DashboardService
 
     /**
      * Statistiques globales
+     * CORRECTION : Utiliser points_unitaire_achat * qt au lieu de pointvaleur
      */
     public function getGlobalStats(string $period): array
     {
@@ -105,7 +106,8 @@ class DashboardService
 
                 return [
                     'total_revenue' => $achats->sum('montant_total_ligne'),
-                    'total_points' => $achats->sum('pointvaleur'),
+                    // CORRECTION ICI : Utiliser points_unitaire_achat * qt
+                    'total_points' => $achats->sum(DB::raw('points_unitaire_achat * qt')),
                     'total_orders' => $achats->count(),
                     'active_distributors' => $achats->distinct('distributeur_id')->count(),
                     'average_basket' => $achats->avg('montant_total_ligne') ?? 0,
@@ -129,12 +131,12 @@ class DashboardService
             'top_products' => $this->getTopProducts($period),
             'geographic_distribution' => $this->getGeographicDistribution($period),
             'hourly_activity' => $this->monitoring->collectMetrics($period)['business']['purchase_velocity'] ?? []
-            // Utiliser collectMetrics au lieu de getBusinessMetrics
         ];
     }
 
     /**
      * Evolution des ventes sur 12 mois
+     * CORRECTION : Utiliser points_unitaire_achat * qt
      */
     protected function getSalesEvolution(string $period): array
     {
@@ -145,11 +147,16 @@ class DashboardService
             $monthPeriod = $current->copy()->subMonths($i)->format('Y-m');
 
             $stats = Achat::where('period', $monthPeriod)
-                        ->selectRaw('COUNT(*) as orders, SUM(montant_total_ligne) as revenue, SUM(pointvaleur) as points')
+                        ->selectRaw('
+                            COUNT(*) as orders,
+                            SUM(montant_total_ligne) as revenue,
+                            SUM(points_unitaire_achat * qt) as points
+                        ')
                         ->first();
 
             $data[] = [
                 'period' => $monthPeriod,
+                'month' => Carbon::parse($monthPeriod)->format('M Y'),
                 'orders' => $stats->orders ?? 0,
                 'revenue' => $stats->revenue ?? 0,
                 'points' => $stats->points ?? 0
@@ -188,8 +195,15 @@ class DashboardService
     {
         return Achat::where('period', $period)
                    ->join('products', 'achats.products_id', '=', 'products.id')
-                   ->groupBy('products.id', 'products.title')
-                   ->selectRaw('products.id, products.title, COUNT(*) as count, SUM(achats.qt) as quantity, SUM(achats.montant_total_ligne) as revenue')
+                   ->groupBy('products.id', 'products.nom_produit')
+                   ->selectRaw('
+                       products.id,
+                       products.nom_produit,
+                       COUNT(*) as count,
+                       SUM(achats.qt) as quantity,
+                       SUM(achats.montant_total_ligne) as revenue,
+                       SUM(achats.points_unitaire_achat * achats.qt) as total_points
+                   ')
                    ->orderByDesc('revenue')
                    ->limit(10)
                    ->get()
@@ -217,6 +231,9 @@ class DashboardService
         ];
     }
 
+    /**
+     * Commandes récentes
+     */
     protected function getRecentOrders(string $period, int $limit): array
     {
         return Achat::where('period', $period)
@@ -228,59 +245,58 @@ class DashboardService
                        return [
                            'id' => $achat->id,
                            'distributeur' => $achat->distributeur->nom_distributeur . ' ' . $achat->distributeur->pnom_distributeur,
-                           'product' => $achat->product->title ?? 'N/A',
+                           'product' => $achat->product->nom_produit ?? 'N/A',
                            'amount' => $achat->montant_total_ligne,
-                           'points' => $achat->pointvaleur,
-                           'created_at' => $achat->created_at->format('d/m/Y H:i')
+                           'points' => $achat->points_unitaire_achat * $achat->qt,
+                           'created_at' => $achat->created_at
                        ];
                    })
                    ->toArray();
     }
 
+    /**
+     * Avancements récents
+     */
     protected function getRecentAdvancements(string $period, int $limit): array
     {
-        return DB::table('avancement_histories')
+        return DB::table('avancement_history')
                 ->where('period', $period)
-                ->join('distributeurs', 'avancement_histories.distributeur_id', '=', 'distributeurs.id')
-                ->orderBy('avancement_histories.created_at', 'desc')
+                ->whereColumn('ancien_grade', '<', 'nouveau_grade')
+                ->orderBy('created_at', 'desc')
                 ->limit($limit)
-                ->select([
-                    'distributeurs.distributeur_id',
-                    'distributeurs.nom_distributeur',
-                    'distributeurs.pnom_distributeur',
-                    'avancement_histories.ancien_grade',
-                    'avancement_histories.nouveau_grade',
-                    'avancement_histories.created_at'
-                ])
                 ->get()
                 ->map(function($item) {
                     return [
-                        'distributeur' => $item->nom_distributeur . ' ' . $item->pnom_distributeur,
-                        'matricule' => $item->distributeur_id,
-                        'from_grade' => $item->ancien_grade,
-                        'to_grade' => $item->nouveau_grade,
-                        'date' => Carbon::parse($item->created_at)->format('d/m/Y')
+                        'distributeur_id' => $item->distributeur_id,
+                        'ancien_grade' => $item->ancien_grade,
+                        'nouveau_grade' => $item->nouveau_grade,
+                        'type_calcul' => $item->type_calcul,
+                        'date_avancement' => $item->date_avancement,
+                        'progression' => $item->nouveau_grade - $item->ancien_grade
                     ];
                 })
                 ->toArray();
     }
 
+    /**
+     * Inscriptions récentes
+     */
     protected function getRecentRegistrations(int $limit): array
     {
         return Distributeur::with('parent')
-                         ->orderBy('created_at', 'desc')
-                         ->limit($limit)
-                         ->get()
-                         ->map(function($dist) {
-                             return [
-                                 'id' => $dist->id,
-                                 'matricule' => $dist->distributeur_id,
-                                 'name' => $dist->nom_distributeur . ' ' . $dist->pnom_distributeur,
-                                 'sponsor' => $dist->parent ? $dist->parent->nom_distributeur . ' ' . $dist->parent->pnom_distributeur : 'N/A',
-                                 'date' => $dist->created_at->format('d/m/Y')
-                             ];
-                         })
-                         ->toArray();
+                          ->orderBy('created_at', 'desc')
+                          ->limit($limit)
+                          ->get()
+                          ->map(function($dist) {
+                              return [
+                                  'id' => $dist->id,
+                                  'matricule' => $dist->distributeur_id,
+                                  'name' => $dist->nom_distributeur . ' ' . $dist->pnom_distributeur,
+                                  'parrain' => $dist->parent ? $dist->parent->nom_distributeur . ' ' . $dist->parent->pnom_distributeur : 'N/A',
+                                  'created_at' => $dist->created_at
+                              ];
+                          })
+                          ->toArray();
     }
 
     /**
@@ -290,38 +306,29 @@ class DashboardService
     {
         $alerts = [];
 
-        // Alerte : Baisse d'activité
-        $currentActive = $this->getGlobalStats($period)['active_distributors'];
-        $previousPeriod = Carbon::createFromFormat('Y-m', $period)->subMonth()->format('Y-m');
-        $previousActive = $this->getGlobalStats($previousPeriod)['active_distributors'];
+        // Vérifier les distributeurs sans grade
+        $noGradeCount = Distributeur::whereDoesntHave('levelCurrent', function($q) use ($period) {
+            $q->where('period', $period);
+        })->count();
 
-        if ($previousActive > 0 && ($currentActive / $previousActive) < 0.8) {
+        if ($noGradeCount > 0) {
             $alerts[] = [
                 'type' => 'warning',
-                'title' => 'Baisse d\'activité',
-                'message' => 'Le nombre de distributeurs actifs a baissé de plus de 20%'
+                'title' => 'Distributeurs sans grade',
+                'message' => "{$noGradeCount} distributeurs n'ont pas de grade pour la période {$period}"
             ];
         }
 
-        // Alerte : Bonus non validés
-        $pendingBonuses = Bonus::where('period', $period)
-                             ->where('status', 'calculé')
-                             ->count();
-        if ($pendingBonuses > 0) {
+        // Vérifier les achats non validés
+        $unvalidatedPurchases = Achat::where('period', $period)
+                                    ->where('online', 0)
+                                    ->count();
+
+        if ($unvalidatedPurchases > 0) {
             $alerts[] = [
                 'type' => 'info',
-                'title' => 'Bonus en attente',
-                'message' => "{$pendingBonuses} bonus sont en attente de validation"
-            ];
-        }
-
-        // Alerte : Performance système
-        $metrics = $this->monitoring->collectMetrics($period);
-        if (($metrics['system']['memory']['current'] ?? 0) > 1024) {
-            $alerts[] = [
-                'type' => 'error',
-                'title' => 'Utilisation mémoire élevée',
-                'message' => 'La consommation mémoire dépasse 1GB'
+                'title' => 'Achats hors ligne',
+                'message' => "{$unvalidatedPurchases} achats sont marqués comme hors ligne"
             ];
         }
 
@@ -333,22 +340,14 @@ class DashboardService
      */
     protected function getPeriodComparisons(string $period): array
     {
-        $periods = [];
-        $current = Carbon::createFromFormat('Y-m', $period);
+        $previousPeriod = Carbon::createFromFormat('Y-m', $period)->subMonth()->format('Y-m');
 
-        // Comparer avec les 3 derniers mois
-        for ($i = 0; $i <= 3; $i++) {
-            $comparePeriod = $current->copy()->subMonths($i)->format('Y-m');
-            $stats = $this->getGlobalStats($comparePeriod);
-
-            $periods[] = [
-                'period' => $comparePeriod,
-                'is_current' => $i === 0,
-                'stats' => $stats
-            ];
-        }
-
-        return $periods;
+        return [
+            'current_period' => $period,
+            'previous_period' => $previousPeriod,
+            'current_stats' => $this->getGlobalStats($period),
+            'previous_stats' => $this->getGlobalStats($previousPeriod)
+        ];
     }
 
     /**
