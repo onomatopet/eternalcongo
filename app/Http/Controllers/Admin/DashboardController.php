@@ -1,5 +1,4 @@
 <?php
-// app/Http/Controllers/Admin/DashboardController.php
 
 namespace App\Http\Controllers\Admin;
 
@@ -8,6 +7,8 @@ use App\Services\DashboardService;
 use App\Services\PerformanceMonitoringService;
 use App\Models\SystemPeriod;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Redis;
+use Barryvdh\DomPDF\Facade\Pdf;
 
 class DashboardController extends Controller
 {
@@ -79,8 +80,8 @@ class DashboardController extends Controller
         $period = $request->get('period', SystemPeriod::getCurrentPeriod()?->period);
         $dashboardData = $this->dashboardService->getDashboardData($period);
 
-        // Utiliser une librairie comme DomPDF ou Snappy
-        $pdf = \PDF::loadView('admin.dashboard.export', compact('dashboardData', 'period'));
+        // Utiliser DomPDF
+        $pdf = Pdf::loadView('admin.dashboard.export', compact('dashboardData', 'period'));
 
         return $pdf->download("dashboard_{$period}.pdf");
     }
@@ -113,7 +114,7 @@ class DashboardController extends Controller
 
         // Vérifier Redis
         try {
-            \Redis::ping();
+            Redis::ping();  // Utilisation correcte de la façade Redis
             $health['checks']['redis'] = 'ok';
         } catch (\Exception $e) {
             $health['status'] = 'degraded';

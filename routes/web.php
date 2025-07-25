@@ -3,12 +3,15 @@
 use App\Http\Controllers\ProfileController;
 use Illuminate\Support\Facades\Route;
 
+use App\Http\Controllers\Admin\PeriodController;
+use App\Http\Controllers\Admin\DashboardController;
+use App\Http\Controllers\Admin\BonusController;
+use App\Http\Controllers\Admin\ProcessController;
+
 // Controllers Admin
 use App\Http\Controllers\Admin\DistributeurController;
 use App\Http\Controllers\Admin\AchatController;
 use App\Http\Controllers\Admin\ProductController;
-use App\Http\Controllers\Admin\BonusController;
-use App\Http\Controllers\Admin\ProcessController;
 use App\Http\Controllers\Admin\AdminSnapshotController;
 use App\Http\Controllers\Admin\DeletionRequestController;
 use App\Http\Controllers\Admin\ModificationRequestController;
@@ -54,6 +57,11 @@ Route::middleware(['auth', 'verified', 'check_admin_role'])
     ->name('admin.')
     ->group(function () {
 
+        // Modification de la route admin.dashboard existante
+        Route::get('/dashboard', function () {
+            return redirect()->route('admin.dashboard.index');
+        })->name('dashboard');
+
         // ===== DASHBOARD ADMIN =====
         Route::get('/', function () {
             return view('admin.dashboard');
@@ -71,9 +79,16 @@ Route::middleware(['auth', 'verified', 'check_admin_role'])
             Route::post('/run-aggregation', [PeriodController::class, 'runAggregation'])->name('run-aggregation');
         });
 
-        // routes/web.php (ajouter dans le groupe admin)
+        // Gestion des périodes
+        Route::prefix('periods')->name('periods.')->group(function () {
+            Route::get('/', [PeriodController::class, 'index'])->name('index');
+            Route::post('/start-validation', [PeriodController::class, 'startValidation'])->name('start-validation');
+            Route::post('/close', [PeriodController::class, 'closePeriod'])->name('close');
+            Route::post('/update-thresholds', [PeriodController::class, 'updateThresholds'])->name('update-thresholds');
+            Route::post('/run-aggregation', [PeriodController::class, 'runAggregation'])->name('run-aggregation');
+        });
 
-        // Dashboard
+        // Dashboard et monitoring
         Route::prefix('dashboard')->name('dashboard.')->group(function () {
             Route::get('/', [DashboardController::class, 'index'])->name('index');
             Route::get('/performance', [DashboardController::class, 'performance'])->name('performance');

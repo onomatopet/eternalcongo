@@ -5,6 +5,7 @@ namespace App\Console\Commands;
 
 use Illuminate\Console\Command;
 use App\Services\CacheService;
+use App\Services\SharedHostingCacheService;
 use App\Models\SystemPeriod;
 
 class WarmDashboardCache extends Command
@@ -12,16 +13,22 @@ class WarmDashboardCache extends Command
     protected $signature = 'mlm:warm-cache {period?}';
     protected $description = 'Précharge le cache pour les tableaux de bord';
 
-    protected CacheService $cacheService;
+    protected $cacheService;
 
-    public function __construct(CacheService $cacheService)
+    public function __construct()
     {
         parent::__construct();
-        $this->cacheService = $cacheService;
     }
 
     public function handle()
     {
+        // Récupérer le service de cache approprié
+        $this->cacheService = app()->make(
+            config('cache.default') === 'redis'
+                ? CacheService::class
+                : SharedHostingCacheService::class
+        );
+
         $period = $this->argument('period') ?? SystemPeriod::getCurrentPeriod()?->period;
 
         if (!$period) {

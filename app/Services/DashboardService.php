@@ -1,5 +1,4 @@
 <?php
-// app/Services/DashboardService.php
 
 namespace App\Services;
 
@@ -13,12 +12,12 @@ use Carbon\Carbon;
 
 class DashboardService
 {
-    protected CacheService $cache;
-    protected PerformanceMonitoringService $monitoring;
+    protected SharedHostingCacheService $cache;
+    protected SharedHostingPerformanceService $monitoring;
 
     public function __construct(
-        CacheService $cache,
-        PerformanceMonitoringService $monitoring
+        SharedHostingCacheService $cache,
+        SharedHostingPerformanceService $monitoring
     ) {
         $this->cache = $cache;
         $this->monitoring = $monitoring;
@@ -27,7 +26,7 @@ class DashboardService
     /**
      * Récupère toutes les données du dashboard principal
      */
-    public function getDashboardData(string $period = null): array
+    public function getDashboardData(?string $period = null): array  // Paramètre explicitement nullable
     {
         $period = $period ?? SystemPeriod::getCurrentPeriod()?->period ?? date('Y-m');
 
@@ -129,7 +128,8 @@ class DashboardService
             'grade_distribution' => $this->getGradeDistribution($period),
             'top_products' => $this->getTopProducts($period),
             'geographic_distribution' => $this->getGeographicDistribution($period),
-            'hourly_activity' => $this->monitoring->getBusinessMetrics($period)['purchase_velocity'] ?? []
+            'hourly_activity' => $this->monitoring->collectMetrics($period)['business']['purchase_velocity'] ?? []
+            // Utiliser collectMetrics au lieu de getBusinessMetrics
         ];
     }
 

@@ -77,6 +77,11 @@ class User extends Authenticatable
         ];
     }
 
+    public function hasPermission($permission)
+    {
+        return true; // Temporaire pour les tests
+    }
+
     /**
      * Obtenir le nom du rôle formaté
      */

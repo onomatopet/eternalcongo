@@ -1,5 +1,4 @@
 <?php
-// app/Services/CacheService.php
 
 namespace App\Services;
 
@@ -21,43 +20,12 @@ class CacheService
     const PREFIX_DASHBOARD = 'mlm_dashboard:';
 
     /**
-     * Cache multi-niveaux avec fallback
+     * Cache avec Redis uniquement
      */
     public function remember(string $key, int $ttl, callable $callback, array $tags = [])
     {
-        // Niveau 1 : Cache mémoire (APCu)
-        if (function_exists('apcu_fetch')) {
-            $value = apcu_fetch($key);
-            if ($value !== false) {
-                Log::debug("Cache hit L1 (APCu): {$key}");
-                return $value;
-            }
-        }
-
-        // Niveau 2 : Redis
-        $value = Cache::tags($tags)->get($key);
-        if ($value !== null) {
-            Log::debug("Cache hit L2 (Redis): {$key}");
-
-            // Stocker aussi en L1 pour les prochains appels
-            if (function_exists('apcu_store')) {
-                apcu_store($key, $value, min($ttl, 300)); // Max 5 min en L1
-            }
-
-            return $value;
-        }
-
-        // Pas en cache, calculer la valeur
-        Log::debug("Cache miss: {$key}");
-        $value = $callback();
-
-        // Stocker dans les deux niveaux
-        Cache::tags($tags)->put($key, $value, $ttl);
-        if (function_exists('apcu_store')) {
-            apcu_store($key, $value, min($ttl, 300));
-        }
-
-        return $value;
+        // Utiliser uniquement Redis/Cache Laravel
+        return Cache::tags($tags)->remember($key, $ttl, $callback);
     }
 
     /**
@@ -75,9 +43,6 @@ class CacheService
     public function forget(string $key): void
     {
         Cache::forget($key);
-        if (function_exists('apcu_delete')) {
-            apcu_delete($key);
-        }
     }
 
     /**

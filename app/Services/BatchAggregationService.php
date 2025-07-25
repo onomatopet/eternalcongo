@@ -10,6 +10,7 @@ use App\Models\SystemPeriod;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Arr;
 
 class BatchAggregationService
 {
@@ -160,7 +161,7 @@ class BatchAggregationService
         foreach (array_chunk($toUpdate, $batchSize) as $batch) {
             foreach ($batch as $update) {
                 LevelCurrent::where('id', $update['id'])
-                          ->update(array_except($update, ['id']));
+                          ->update(Arr::except($update, ['id']));  // Utiliser Arr::except
                 $updates++;
             }
         }
