@@ -77,9 +77,20 @@ class User extends Authenticatable
         ];
     }
 
+    public function distributeur()
+    {
+        return $this->hasOne(Distributeur::class, 'user_id');
+    }
+
     public function hasPermission($permission)
     {
-        return true; // Temporaire pour les tests
+        // Pour le développement, temporairement retourner true pour tester
+        // TODO: Implémenter la vraie logique de permissions
+        return true;
+
+        // Ou si vous avez une vraie logique de permissions :
+        // return $this->permissions->contains('name', $permission) ||
+        //        $this->roles->flatMap->permissions->contains('name', $permission);
     }
 
     /**

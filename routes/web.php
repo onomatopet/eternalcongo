@@ -3,12 +3,11 @@
 use App\Http\Controllers\ProfileController;
 use Illuminate\Support\Facades\Route;
 
+// Controllers Admin
 use App\Http\Controllers\Admin\PeriodController;
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\BonusController;
 use App\Http\Controllers\Admin\ProcessController;
-
-// Controllers Admin
 use App\Http\Controllers\Admin\DistributeurController;
 use App\Http\Controllers\Admin\AchatController;
 use App\Http\Controllers\Admin\ProductController;
@@ -17,6 +16,14 @@ use App\Http\Controllers\Admin\DeletionRequestController;
 use App\Http\Controllers\Admin\ModificationRequestController;
 use App\Http\Controllers\Admin\AchatReturnController;
 use App\Http\Controllers\Admin\NetworkExportController;
+
+// Controllers Distributor (à créer)
+use App\Http\Controllers\Distributor\DistributorDashboardController;
+use App\Http\Controllers\Distributor\DistributorProfileController;
+use App\Http\Controllers\Distributor\DistributorNetworkController;
+use App\Http\Controllers\Distributor\DistributorBonusController;
+use App\Http\Controllers\Distributor\DistributorPurchaseController;
+
 use App\Models\DeletionRequest;
 use App\Models\Distributeur;
 use App\Services\DeletionValidationService;
@@ -25,22 +32,40 @@ use Illuminate\Http\Request;
 
 require __DIR__.'/auth.php';
 
-// ===== ROUTES PUBLIQUES =====
+/*
+|--------------------------------------------------------------------------
+| ROUTES PUBLIQUES
+|--------------------------------------------------------------------------
+*/
 
+// Landing page
 Route::get('/', function () {
-    return view('welcome');
-});
+    return view('landing');
+})->name('home');
 
-// ===== ROUTES AUTHENTIFIÉES BASIQUES =====
+/*
+|--------------------------------------------------------------------------
+| ROUTES AUTHENTIFIÉES BASIQUES
+|--------------------------------------------------------------------------
+*/
 
 Route::middleware('auth')->group(function () {
 
-    // Dashboard principal (pour les utilisateurs connectés)
+    // Dashboard principal avec redirection selon le rôle
     Route::get('/dashboard', function () {
+        $user = Auth::user();
+
         // Rediriger vers le dashboard admin si l'utilisateur a les permissions admin
-        if (Auth::check() && Auth::user()->hasPermission('access_admin')) {
+        if ($user->hasPermission('access_admin')) {
             return redirect()->route('admin.dashboard');
         }
+
+        // Rediriger vers le dashboard distributeur si l'utilisateur est un distributeur
+        if ($user->distributeur) {
+            return redirect()->route('distributor.dashboard');
+        }
+
+        // Par défaut, afficher le dashboard basique
         return view('dashboard');
     })->middleware('verified')->name('dashboard');
 
@@ -50,45 +75,41 @@ Route::middleware('auth')->group(function () {
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
 });
 
-// ===== ROUTES ADMIN AVEC PERMISSIONS =====
+/*
+|--------------------------------------------------------------------------
+| ROUTES ESPACE DISTRIBUTEUR
+|--------------------------------------------------------------------------
+*/
+
+Route::middleware(['auth', 'verified'])
+    ->prefix('distributor')
+    ->name('distributor.')
+    ->group(function () {
+        Route::get('/dashboard', [DistributorDashboardController::class, 'index'])->name('dashboard');
+        Route::get('/profile', [DistributorProfileController::class, 'show'])->name('profile.show');
+        Route::get('/network', [DistributorNetworkController::class, 'index'])->name('network.index');
+        Route::get('/network/tree', [DistributorNetworkController::class, 'tree'])->name('network.tree');
+        Route::get('/bonuses', [DistributorBonusController::class, 'index'])->name('bonuses.index');
+        Route::get('/bonuses/{bonus}', [DistributorBonusController::class, 'show'])->name('bonuses.show');
+        Route::get('/purchases', [DistributorPurchaseController::class, 'index'])->name('purchases.index');
+        Route::get('/purchases/{purchase}', [DistributorPurchaseController::class, 'show'])->name('purchases.show');
+    });
+
+/*
+|--------------------------------------------------------------------------
+| ROUTES ADMIN AVEC PERMISSIONS
+|--------------------------------------------------------------------------
+*/
 
 Route::middleware(['auth', 'verified', 'check_admin_role'])
     ->prefix('admin')
     ->name('admin.')
     ->group(function () {
 
-        // Modification de la route admin.dashboard existante
-        Route::get('/dashboard', function () {
-            return redirect()->route('admin.dashboard.index');
-        })->name('dashboard');
+        // Dashboard principal admin
+        Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
 
-        // ===== DASHBOARD ADMIN =====
-        Route::get('/', function () {
-            return view('admin.dashboard');
-        })->name('dashboard');
-
-        // routes/web.php (ajouter dans le groupe admin)
-
-        Route::prefix('periods')->name('periods.')->group(function () {
-            Route::get('/', [PeriodController::class, 'index'])->name('index');
-            Route::post('/start-validation', [PeriodController::class, 'startValidation'])->name('start-validation');
-            Route::post('/close', [PeriodController::class, 'closePeriod'])->name('close');
-            Route::post('/update-thresholds', [PeriodController::class, 'updateThresholds'])->name('update-thresholds');
-
-            // Agrégation manuelle
-            Route::post('/run-aggregation', [PeriodController::class, 'runAggregation'])->name('run-aggregation');
-        });
-
-        // Gestion des périodes
-        Route::prefix('periods')->name('periods.')->group(function () {
-            Route::get('/', [PeriodController::class, 'index'])->name('index');
-            Route::post('/start-validation', [PeriodController::class, 'startValidation'])->name('start-validation');
-            Route::post('/close', [PeriodController::class, 'closePeriod'])->name('close');
-            Route::post('/update-thresholds', [PeriodController::class, 'updateThresholds'])->name('update-thresholds');
-            Route::post('/run-aggregation', [PeriodController::class, 'runAggregation'])->name('run-aggregation');
-        });
-
-        // Dashboard et monitoring
+        // ===== DASHBOARD ET MONITORING =====
         Route::prefix('dashboard')->name('dashboard.')->group(function () {
             Route::get('/', [DashboardController::class, 'index'])->name('index');
             Route::get('/performance', [DashboardController::class, 'performance'])->name('performance');
@@ -96,37 +117,27 @@ Route::middleware(['auth', 'verified', 'check_admin_role'])
             Route::get('/export', [DashboardController::class, 'export'])->name('export');
         });
 
-        // Redirection vers le dashboard après connexion
-        Route::get('/admin', function () {
-            return redirect()->route('admin.dashboard.index');
-        })->name('admin');
-
         // ===== GESTION DES DISTRIBUTEURS =====
         Route::prefix('distributeurs')->name('distributeurs.')->group(function () {
-
-            // Routes CRUD classiques
             Route::get('/', [DistributeurController::class, 'index'])->name('index');
             Route::get('/create', [DistributeurController::class, 'create'])->name('create');
             Route::post('/', [DistributeurController::class, 'store'])->name('store');
             Route::get('/{distributeur}', [DistributeurController::class, 'show'])->name('show');
             Route::get('/{distributeur}/edit', [DistributeurController::class, 'edit'])->name('edit');
             Route::put('/{distributeur}', [DistributeurController::class, 'update'])->name('update');
-            Route::patch('/{distributeur}', [DistributeurController::class, 'update']);
-
-            // Routes de suppression sécurisée
-            Route::get('/{distributeur}/confirm-deletion', [DistributeurController::class, 'confirmDeletion'])
-                ->name('confirm-deletion');
-                // ->middleware('permission:delete_distributeurs'); // Commenté temporairement
-
-            Route::post('/{distributeur}/request-deletion', [DistributeurController::class, 'requestDeletion'])
-                ->name('request-deletion');
-                // ->middleware('permission:delete_distributeurs'); // Commenté temporairement
-
-            // Ancienne route destroy redirigée vers la nouvelle interface
             Route::delete('/{distributeur}', [DistributeurController::class, 'destroy'])->name('destroy');
 
-            // Route de recherche AJAX (DOIT être AVANT les routes avec paramètres)
-            Route::get('/search/ajax', [DistributeurController::class, 'search'])->name('search');
+            // Actions spécifiques
+            Route::post('/{distributeur}/request-deletion', [DistributeurController::class, 'requestDeletion'])->name('request-deletion');
+            Route::get('/{distributeur}/network', [DistributeurController::class, 'network'])->name('network');
+            Route::get('/{distributeur}/stats', [DistributeurController::class, 'stats'])->name('stats');
+        });
+
+        // ===== EXPORT RÉSEAU =====
+        Route::prefix('network')->name('network.')->group(function () {
+            Route::get('/', [NetworkExportController::class, 'index'])->name('index');
+            Route::post('/export', [NetworkExportController::class, 'export'])->name('export');
+            Route::get('/download/{filename}', [NetworkExportController::class, 'download'])->name('download');
         });
 
         // ===== GESTION DES ACHATS =====
@@ -137,24 +148,12 @@ Route::middleware(['auth', 'verified', 'check_admin_role'])
             Route::get('/{achat}', [AchatController::class, 'show'])->name('show');
             Route::get('/{achat}/edit', [AchatController::class, 'edit'])->name('edit');
             Route::put('/{achat}', [AchatController::class, 'update'])->name('update');
-            Route::patch('/{achat}', [AchatController::class, 'update']);
             Route::delete('/{achat}', [AchatController::class, 'destroy'])->name('destroy');
 
-            // Routes utilitaires
-            Route::get('/product-info/ajax', [AchatController::class, 'getProductInfo'])->name('product-info');
-        });
-
-        // ===== GESTION DES RETOURS ET ANNULATIONS D'ACHATS =====
-        Route::prefix('achat-returns')->name('achat-returns.')->group(function () {
-            Route::get('/', [AchatReturnController::class, 'index'])->name('index');
-            Route::get('/create/{achat}', [AchatReturnController::class, 'create'])->name('create');
-            Route::post('/{achat}', [AchatReturnController::class, 'store'])->name('store');
-            Route::get('/{returnRequest}', [AchatReturnController::class, 'show'])->name('show');
-            Route::post('/{returnRequest}/approve', [AchatReturnController::class, 'approve'])->name('approve');
-            Route::post('/{returnRequest}/reject', [AchatReturnController::class, 'reject'])->name('reject');
-            Route::post('/{returnRequest}/execute', [AchatReturnController::class, 'execute'])->name('execute');
-            Route::delete('/{returnRequest}/cancel', [AchatReturnController::class, 'cancel'])->name('cancel');
-            Route::get('/report/period', [AchatReturnController::class, 'report'])->name('report');
+            // Retours d'achats
+            Route::post('/{achat}/return', [AchatReturnController::class, 'create'])->name('return.create');
+            Route::post('/returns/{return}/approve', [AchatReturnController::class, 'approve'])->name('return.approve');
+            Route::post('/returns/{return}/reject', [AchatReturnController::class, 'reject'])->name('return.reject');
         });
 
         // ===== GESTION DES PRODUITS =====
@@ -165,11 +164,7 @@ Route::middleware(['auth', 'verified', 'check_admin_role'])
             Route::get('/{product}', [ProductController::class, 'show'])->name('show');
             Route::get('/{product}/edit', [ProductController::class, 'edit'])->name('edit');
             Route::put('/{product}', [ProductController::class, 'update'])->name('update');
-            Route::patch('/{product}', [ProductController::class, 'update']);
             Route::delete('/{product}', [ProductController::class, 'destroy'])->name('destroy');
-
-            // Routes utilitaires
-            Route::get('/search/ajax', [ProductController::class, 'search'])->name('search');
         });
 
         // ===== GESTION DES BONUS =====
@@ -182,25 +177,26 @@ Route::middleware(['auth', 'verified', 'check_admin_role'])
             Route::put('/{bonus}', [BonusController::class, 'update'])->name('update');
             Route::delete('/{bonus}', [BonusController::class, 'destroy'])->name('destroy');
 
-            // Route pour générer le PDF
+            // Routes spécifiques bonus
             Route::get('/{bonus}/pdf', [BonusController::class, 'generatePdf'])->name('pdf');
-
-            // Routes de calcul
             Route::get('/calculate/{period}', [BonusController::class, 'showCalculation'])->name('calculate.show');
             Route::post('/calculate/{period}', [BonusController::class, 'calculate'])->name('calculate');
         });
 
-        // ===== PROCESSUS DE CALCUL =====
+        // ===== GESTION DES PÉRIODES =====
+        Route::prefix('periods')->name('periods.')->group(function () {
+            Route::get('/', [PeriodController::class, 'index'])->name('index');
+            Route::post('/start-validation', [PeriodController::class, 'startValidation'])->name('start-validation');
+            Route::post('/close', [PeriodController::class, 'closePeriod'])->name('close');
+            Route::post('/update-thresholds', [PeriodController::class, 'updateThresholds'])->name('update-thresholds');
+            Route::post('/run-aggregation', [PeriodController::class, 'runAggregation'])->name('run-aggregation');
+        });
+
+        // ===== PROCESSUS MÉTIER =====
         Route::prefix('processes')->name('processes.')->group(function () {
             Route::get('/', [ProcessController::class, 'index'])->name('index');
-
-            // Routes pour les avancements
             Route::post('/advancements', [ProcessController::class, 'processAdvancements'])->name('advancements');
-
-            // Routes pour la régularisation
             Route::post('/regularization', [ProcessController::class, 'regularizeGrades'])->name('regularization');
-
-            // Historique des exécutions (si vous avez ces méthodes)
             Route::get('/history', [ProcessController::class, 'history'])->name('history');
         });
 
@@ -208,81 +204,14 @@ Route::middleware(['auth', 'verified', 'check_admin_role'])
         Route::prefix('snapshots')->name('snapshots.')->group(function () {
             Route::get('/create', [AdminSnapshotController::class, 'create'])->name('create');
             Route::post('/', [AdminSnapshotController::class, 'store'])->name('store');
+            Route::get('/', [AdminSnapshotController::class, 'index'])->name('index');
+            Route::get('/{snapshot}', [AdminSnapshotController::class, 'show'])->name('show');
+            Route::post('/{snapshot}/restore', [AdminSnapshotController::class, 'restore'])->name('restore');
+            Route::delete('/{snapshot}', [AdminSnapshotController::class, 'destroy'])->name('destroy');
         });
 
         // ===== GESTION DES DEMANDES DE SUPPRESSION =====
         Route::prefix('deletion-requests')->name('deletion-requests.')->group(function () {
-            Route::get('/', [DeletionRequestController::class, 'index'])->name('index');
-            Route::get('/{deletionRequest}', [DeletionRequestController::class, 'show'])->name('show');
-            Route::post('/{deletionRequest}/approve', [DeletionRequestController::class, 'approve'])->name('approve');
-            Route::post('/{deletionRequest}/reject', [DeletionRequestController::class, 'reject'])->name('reject');
-        });
-
-        // ===== GESTION DES DEMANDES DE MODIFICATION =====
-        Route::prefix('modification-requests')->name('modification-requests.')->group(function () {
-            Route::get('/', [ModificationRequestController::class, 'index'])->name('index');
-            Route::get('/{modificationRequest}', [ModificationRequestController::class, 'show'])->name('show');
-
-            // Création de demandes spécifiques
-            Route::get('/create/parent-change/{distributeur}', [ModificationRequestController::class, 'createParentChange'])->name('create.parent-change');
-            Route::post('/store/parent-change/{distributeur}', [ModificationRequestController::class, 'storeParentChange'])->name('store.parent-change');
-
-            Route::get('/create/grade-change/{distributeur}', [ModificationRequestController::class, 'createGradeChange'])->name('create.grade-change');
-            Route::post('/store/grade-change/{distributeur}', [ModificationRequestController::class, 'storeGradeChange'])->name('store.grade-change');
-
-            // Actions sur les demandes
-            Route::post('/{modificationRequest}/approve', [ModificationRequestController::class, 'approve'])->name('approve');
-            Route::post('/{modificationRequest}/reject', [ModificationRequestController::class, 'reject'])->name('reject');
-            Route::post('/{modificationRequest}/execute', [ModificationRequestController::class, 'execute'])->name('execute');
-            Route::delete('/{modificationRequest}/cancel', [ModificationRequestController::class, 'cancel'])->name('cancel');
-
-            // Validation AJAX
-            Route::post('/validate', [ModificationRequestController::class, 'validateChange'])->name('validate');
-        });
-
-        // ===== GESTION DES BACKUPS =====
-        Route::prefix('backups')->name('backups.')->group(function () {
-
-            // Liste des backups
-            Route::get('/', [DeletionRequestController::class, 'backups'])
-                ->name('index');
-                // ->middleware('permission:view_backups'); // Commenté temporairement
-
-            // Restauration depuis backup
-            Route::post('/restore', [DeletionRequestController::class, 'restoreBackup'])
-                ->name('restore');
-                // ->middleware('permission:restore_backups'); // Commenté temporairement
-        });
-
-        // ===== ROUTES API POUR AJAX =====
-        Route::prefix('api')->name('api.')->group(function () {
-
-            // Recherche de distributeurs
-            Route::get('/distributeurs/search', [DistributeurController::class, 'apiSearch'])->name('distributeurs.search');
-
-            // Informations produit
-            Route::get('/products/{product}/info', [ProductController::class, 'apiGetInfo'])->name('products.info');
-
-            // Routes commentées temporairement si les méthodes n'existent pas
-            /*
-            // Validation de suppression
-            Route::post('/distributeurs/{distributeur}/validate-deletion', function (Distributeur $distributeur) {
-                $validationService = app(DeletionValidationService::class);
-                return response()->json($validationService->validateDeletion($distributeur));
-            })->name('distributeurs.validate-deletion');
-
-            // Impact de suppression
-            Route::post('/distributeurs/{distributeur}/deletion-impact', function (Distributeur $distributeur) {
-                $validationService = app(DeletionValidationService::class);
-                return response()->json($validationService->getDeletionImpact($distributeur));
-            })->name('distributeurs.deletion-impact');
-            */
-        });
-
-        // ===== GESTION DES DEMANDES DE SUPPRESSION =====
-        Route::prefix('deletion-requests')->name('deletion-requests.')->group(function () {
-            // IMPORTANT : Les routes spécifiques doivent être AVANT les routes avec paramètres
-
             // Routes sans paramètres (doivent être en premier)
             Route::get('/', [DeletionRequestController::class, 'index'])->name('index');
             Route::get('/backups', [DeletionRequestController::class, 'backups'])->name('backups');
@@ -309,6 +238,9 @@ Route::middleware(['auth', 'verified', 'check_admin_role'])
             Route::get('/create/grade-change/{distributeur}', [ModificationRequestController::class, 'createGradeChange'])->name('create.grade-change');
             Route::post('/store/grade-change/{distributeur}', [ModificationRequestController::class, 'storeGradeChange'])->name('store.grade-change');
 
+            Route::get('/create/cumul-adjustment/{levelCurrent}', [ModificationRequestController::class, 'createCumulAdjustment'])->name('create.cumul-adjustment');
+            Route::post('/store/cumul-adjustment/{levelCurrent}', [ModificationRequestController::class, 'storeCumulAdjustment'])->name('store.cumul-adjustment');
+
             // Actions sur les demandes
             Route::post('/{modificationRequest}/approve', [ModificationRequestController::class, 'approve'])->name('approve');
             Route::post('/{modificationRequest}/reject', [ModificationRequestController::class, 'reject'])->name('reject');
@@ -319,32 +251,55 @@ Route::middleware(['auth', 'verified', 'check_admin_role'])
             Route::post('/validate', [ModificationRequestController::class, 'validateChange'])->name('validate');
         });
 
-        // ===== GESTION DU RÉSEAU DISTRIBUTEUR =====
-        Route::prefix('network')->name('network.')->group(function () {
-            Route::get('/', [NetworkExportController::class, 'index'])->name('index');
-
-            // Routes pour la recherche AJAX
-            Route::get('/search/distributeurs', [NetworkExportController::class, 'searchDistributeurs'])->name('search.distributeurs');
-            Route::get('/search/periods', [NetworkExportController::class, 'searchPeriods'])->name('search.periods');
-
-            Route::get('/export', [NetworkExportController::class, 'export'])->name('export');
-            Route::post('/export-html', [NetworkExportController::class, 'exportHtml'])->name('export.html');
-            Route::post('/export-pdf', [NetworkExportController::class, 'exportPdf'])->name('export.pdf');
-            Route::post('/export-excel', [NetworkExportController::class, 'exportExcel'])->name('export.excel');
+        // ===== GESTION DES BACKUPS =====
+        Route::prefix('backups')->name('backups.')->group(function () {
+            Route::get('/', [DeletionRequestController::class, 'backups'])->name('index');
+            Route::post('/restore', [DeletionRequestController::class, 'restoreBackup'])->name('restore');
+            Route::get('/download/{backup}', [DeletionRequestController::class, 'downloadBackup'])->name('download');
+            Route::delete('/{backup}', [DeletionRequestController::class, 'deleteBackup'])->name('delete');
         });
 
+        // ===== ROUTES API POUR AJAX =====
+        Route::prefix('api')->name('api.')->group(function () {
+            // Recherche de distributeurs
+            Route::get('/distributeurs/search', [DistributeurController::class, 'apiSearch'])->name('distributeurs.search');
+
+            // Informations produit
+            Route::get('/products/{product}/info', [ProductController::class, 'apiGetInfo'])->name('products.info');
+
+            // Validation de suppression
+            Route::post('/distributeurs/{distributeur}/validate-deletion', function (Distributeur $distributeur) {
+                $validationService = app(DeletionValidationService::class);
+                // Utiliser la bonne méthode qui existe dans le service
+                return response()->json($validationService->validateDistributeurDeletion($distributeur));
+            })->name('distributeurs.validate-deletion');
+
+            // Impact de suppression
+            Route::post('/distributeurs/{distributeur}/deletion-impact', function (Distributeur $distributeur) {
+                $validationService = app(DeletionValidationService::class);
+                // Utiliser la méthode existante et extraire l'impact
+                $validation = $validationService->validateDistributeurDeletion($distributeur);
+                return response()->json([
+                    'impact' => $validation['related_data']['hierarchy_impact'] ?? [],
+                    'impact_level' => $validation['impact_level'] ?? 'low',
+                    'warnings' => $validation['warnings'] ?? [],
+                    'blockers' => $validation['blockers'] ?? []
+                ]);
+            })->name('distributeurs.deletion-impact');
+
+            // Statistiques temps réel
+            Route::get('/dashboard/stats', [DashboardController::class, 'apiStats'])->name('dashboard.stats');
+            Route::get('/dashboard/notifications', [DashboardController::class, 'apiNotifications'])->name('dashboard.notifications');
+        });
     });
 
-// ===== ROUTES POUR DISTRIBUTEURS CONNECTÉS (Phase 3) =====
-// À activer quand le module distributeur sera développé
 /*
-Route::middleware(['auth', 'verified', 'distributor'])
-    ->prefix('distributor')
-    ->name('distributor.')
-    ->group(function () {
-        Route::get('/dashboard', [DistributorDashboardController::class, 'index'])->name('dashboard');
-        Route::get('/profile', [DistributorProfileController::class, 'show'])->name('profile.show');
-        Route::get('/downline', [DistributorDownlineController::class, 'index'])->name('downline.index');
-        Route::get('/bonuses', [DistributorBonusController::class, 'index'])->name('bonuses.index');
-    });
+|--------------------------------------------------------------------------
+| FALLBACK ROUTES
+|--------------------------------------------------------------------------
 */
+
+// Redirection pour les URL non trouvées
+Route::fallback(function () {
+    return redirect()->route('home');
+});

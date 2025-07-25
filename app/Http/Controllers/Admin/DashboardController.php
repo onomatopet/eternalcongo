@@ -3,136 +3,90 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Services\DashboardService;
-use App\Services\PerformanceMonitoringService;
-use App\Models\SystemPeriod;
+use App\Models\Distributeur;
+use App\Models\Achat;
+use App\Models\ModificationRequest;
+use App\Models\DeletionRequest;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Redis;
-use Barryvdh\DomPDF\Facade\Pdf;
+use Illuminate\Support\Facades\DB;
 
 class DashboardController extends Controller
 {
-    protected DashboardService $dashboardService;
-    protected PerformanceMonitoringService $monitoringService;
-
-    public function __construct(
-        DashboardService $dashboardService,
-        PerformanceMonitoringService $monitoringService
-    ) {
-        $this->dashboardService = $dashboardService;
-        $this->monitoringService = $monitoringService;
-    }
-
-    /**
-     * Dashboard principal
-     */
-    public function index(Request $request)
+    public function index()
     {
-        $period = $request->get('period', SystemPeriod::getCurrentPeriod()?->period);
-
-        if (!$period) {
-            return redirect()->route('admin.periods.index')
-                           ->with('error', 'Aucune période active. Veuillez configurer une période.');
-        }
-
-        $dashboardData = $this->dashboardService->getDashboardData($period);
-        $availablePeriods = SystemPeriod::orderBy('period', 'desc')->pluck('period');
-
-        return view('admin.dashboard.index', compact('dashboardData', 'availablePeriods', 'period'));
-    }
-
-    /**
-     * Dashboard de performance
-     */
-    public function performance(Request $request)
-    {
-        $period = $request->get('period', SystemPeriod::getCurrentPeriod()?->period);
-
-        $metrics = $this->monitoringService->collectMetrics($period);
-        $history = $this->monitoringService->getMetricsHistory(24);
-
-        return view('admin.dashboard.performance', compact('metrics', 'history', 'period'));
-    }
-
-    /**
-     * API pour les données temps réel
-     */
-    public function realtime(Request $request)
-    {
-        $period = $request->get('period', SystemPeriod::getCurrentPeriod()?->period);
-
-        // Données légères pour mise à jour temps réel
-        $realtimeData = [
-            'timestamp' => now()->toISOString(),
-            'active_users' => $this->getActiveUsersCount(),
-            'recent_sales' => $this->getRecentSalesCount($period, 5), // Dernières 5 minutes
-            'system_health' => $this->getSystemHealth()
+        // Statistiques générales
+        $stats = [
+            'total_distributeurs' => Distributeur::count(),
+            'active_distributeurs' => Distributeur::where('created_at', '>=', now()->subDays(30))->count(),
+            'total_achats' => Achat::whereMonth('created_at', now()->month)->count(),
+            'revenue_month' => Achat::whereMonth('created_at', now()->month)->sum('point_achat'),
+            'pending_modifications' => ModificationRequest::pending()->count(),
+            'pending_deletions' => DeletionRequest::pending()->count(),
         ];
 
-        return response()->json($realtimeData);
+        // Graphiques et données pour le dashboard
+        $monthlyRevenue = $this->getMonthlyRevenue();
+        $topDistributeurs = $this->getTopDistributeurs();
+        $recentActivities = $this->getRecentActivities();
+
+        return view('admin.dashboard.index', compact('stats', 'monthlyRevenue', 'topDistributeurs', 'recentActivities'));
     }
 
-    /**
-     * Export du dashboard en PDF
-     */
-    public function export(Request $request)
+    public function performance()
     {
-        $period = $request->get('period', SystemPeriod::getCurrentPeriod()?->period);
-        $dashboardData = $this->dashboardService->getDashboardData($period);
+        // Données de performance
+        $performanceData = [
+            'grade_distribution' => $this->getGradeDistribution(),
+            'network_growth' => $this->getNetworkGrowth(),
+            'bonus_statistics' => $this->getBonusStatistics(),
+        ];
 
-        // Utiliser DomPDF
-        $pdf = Pdf::loadView('admin.dashboard.export', compact('dashboardData', 'period'));
-
-        return $pdf->download("dashboard_{$period}.pdf");
+        return view('admin.dashboard.performance', compact('performanceData'));
     }
 
-    protected function getActiveUsersCount(): int
+    private function getMonthlyRevenue()
     {
-        // Compter les utilisateurs actifs dans les 15 dernières minutes
-        return \App\Models\User::where('last_activity', '>=', now()->subMinutes(15))->count();
+        return Achat::selectRaw('MONTH(created_at) as month, SUM(point_achat) as total')
+            ->whereYear('created_at', now()->year)
+            ->groupBy('month')
+            ->orderBy('month')
+            ->get();
     }
 
-    protected function getRecentSalesCount(string $period, int $minutes): int
+    private function getTopDistributeurs()
     {
-        return \App\Models\Achat::where('period', $period)
-                               ->where('created_at', '>=', now()->subMinutes($minutes))
-                               ->count();
+        return Distributeur::withSum('achats', 'point_achat')
+            ->orderByDesc('achats_sum_point_achat')
+            ->limit(10)
+            ->get();
     }
 
-    protected function getSystemHealth(): array
+    private function getRecentActivities()
     {
-        $health = ['status' => 'healthy', 'checks' => []];
+        // Récupérer les activités récentes
+        return collect();
+    }
 
-        // Vérifier la base de données
-        try {
-            \DB::connection()->getPdo();
-            $health['checks']['database'] = 'ok';
-        } catch (\Exception $e) {
-            $health['status'] = 'degraded';
-            $health['checks']['database'] = 'error';
-        }
+    private function getGradeDistribution()
+    {
+        return Distributeur::selectRaw('grade, COUNT(*) as count')
+            ->groupBy('grade')
+            ->orderBy('grade')
+            ->get();
+    }
 
-        // Vérifier Redis
-        try {
-            Redis::ping();  // Utilisation correcte de la façade Redis
-            $health['checks']['redis'] = 'ok';
-        } catch (\Exception $e) {
-            $health['status'] = 'degraded';
-            $health['checks']['redis'] = 'error';
-        }
+    private function getNetworkGrowth()
+    {
+        return Distributeur::selectRaw('DATE(created_at) as date, COUNT(*) as count')
+            ->where('created_at', '>=', now()->subDays(30))
+            ->groupBy('date')
+            ->orderBy('date')
+            ->get();
+    }
 
-        // Vérifier l'espace disque
-        $freeSpace = disk_free_space('/');
-        $totalSpace = disk_total_space('/');
-        $usagePercent = (($totalSpace - $freeSpace) / $totalSpace) * 100;
-
-        if ($usagePercent > 90) {
-            $health['status'] = 'degraded';
-            $health['checks']['disk'] = 'warning';
-        } else {
-            $health['checks']['disk'] = 'ok';
-        }
-
-        return $health;
+    private function getBonusStatistics()
+    {
+        // Statistiques des bonus
+        return [];
     }
 }
