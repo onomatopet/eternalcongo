@@ -1,74 +1,88 @@
 <?php
+// app/Models/Bonus.php
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-/**
- * Représente un enregistrement de bonus pour un distributeur pour une période.
- *
- * @property int $id
- * @property string $period
- * @property string $num Numéro/Identifiant du bonus/formulaire
- * @property int $distributeur_id (Devrait maintenant être l'ID primaire)
- * @property float|null $bonus_direct (Casté decimal)
- * @property float|null $bonus_indirect (Casté decimal)
- * @property float|null $bonus_leadership (Casté decimal)
- * @property float $bonus (Total, casté decimal)
- * @property float $epargne (Casté decimal)
- * @property \Illuminate\Support\Carbon|null $created_at
- * @property \Illuminate\Support\Carbon|null $updated_at
- *
- * @property-read Distributeur $distributeur
- */
 class Bonus extends Model
 {
-    use HasFactory;
-
-    protected $table = 'bonuses';
-    public $timestamps = true;
-
     protected $fillable = [
-        'period',
         'num',
         'distributeur_id',
-        'bonus_direct',
-        'bonus_indirect',
-        'bonus_leadership',
-        'montant', // Changé de 'bonus' à 'montant'
-        'epargne',
+        'period',
+        'montant_direct',
+        'montant_indirect',
+        'montant_leadership',
+        'montant_total',
+        'status',
+        'details',
+        'calculated_at',
+        'validated_by',
+        'validated_at',
+        'paid_at',
+        'payment_reference'
     ];
 
     protected $casts = [
-        'distributeur_id' => 'integer',
-        'bonus_direct' => 'decimal:2',
-        'bonus_indirect' => 'decimal:2',
-        'bonus_leadership' => 'decimal:2',
-        'montant' => 'decimal:2', // Changé de 'bonus' à 'montant'
-        'epargne' => 'decimal:2',
-        'created_at' => 'datetime',
-        'updated_at' => 'datetime',
+        'montant_direct' => 'decimal:2',
+        'montant_indirect' => 'decimal:2',
+        'montant_leadership' => 'decimal:2',
+        'montant_total' => 'decimal:2',
+        'details' => 'array',
+        'calculated_at' => 'datetime',
+        'validated_at' => 'datetime',
+        'paid_at' => 'datetime'
     ];
 
-    // Si vous avez des accesseurs/mutateurs, mettez-les à jour aussi
-    public function getMontantFormattedAttribute()
-    {
-        return number_format($this->montant, 2, ',', ' ') . ' FCFA';
-    }
+    const STATUS_CALCULE = 'calculé';
+    const STATUS_VALIDE = 'validé';
+    const STATUS_EN_PAIEMENT = 'en_paiement';
+    const STATUS_PAYE = 'payé';
+    const STATUS_ANNULE = 'annulé';
 
-    // Si vous aviez un accessor pour 'bonus', renommez-le
-    public function getBonusTotalAttribute()
-    {
-        return $this->bonus_direct + $this->bonus_indirect + $this->bonus_leadership;
-    }
-
-    /**
-     * Relation: Cet enregistrement de Bonus appartient à un Distributeur.
-     */
     public function distributeur(): BelongsTo
     {
-        return $this->belongsTo(Distributeur::class, 'distributeur_id', 'id');
+        return $this->belongsTo(Distributeur::class, 'distributeur_id');
+    }
+
+    public function validator(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'validated_by');
+    }
+
+    public function scopeForPeriod($query, string $period)
+    {
+        return $query->where('period', $period);
+    }
+
+    public function scopePending($query)
+    {
+        return $query->where('status', self::STATUS_CALCULE);
+    }
+
+    public function scopeValidated($query)
+    {
+        return $query->where('status', self::STATUS_VALIDE);
+    }
+
+    public function getFormattedNumAttribute(): string
+    {
+        // Format: 7770-MM-YY-XXX
+        return substr($this->num, 0, 4) . '-' .
+               substr($this->num, 4, 2) . '-' .
+               substr($this->num, 6, 2) . '-' .
+               substr($this->num, 8, 3);
+    }
+
+    public function canBeValidated(): bool
+    {
+        return $this->status === self::STATUS_CALCULE;
+    }
+
+    public function canBePaid(): bool
+    {
+        return $this->status === self::STATUS_VALIDE;
     }
 }

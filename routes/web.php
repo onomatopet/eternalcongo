@@ -59,6 +59,33 @@ Route::middleware(['auth', 'verified', 'check_admin_role'])
             return view('admin.dashboard');
         })->name('dashboard');
 
+        // routes/web.php (ajouter dans le groupe admin)
+
+        Route::prefix('periods')->name('periods.')->group(function () {
+            Route::get('/', [PeriodController::class, 'index'])->name('index');
+            Route::post('/start-validation', [PeriodController::class, 'startValidation'])->name('start-validation');
+            Route::post('/close', [PeriodController::class, 'closePeriod'])->name('close');
+            Route::post('/update-thresholds', [PeriodController::class, 'updateThresholds'])->name('update-thresholds');
+
+            // Agrégation manuelle
+            Route::post('/run-aggregation', [PeriodController::class, 'runAggregation'])->name('run-aggregation');
+        });
+
+        // routes/web.php (ajouter dans le groupe admin)
+
+        // Dashboard
+        Route::prefix('dashboard')->name('dashboard.')->group(function () {
+            Route::get('/', [DashboardController::class, 'index'])->name('index');
+            Route::get('/performance', [DashboardController::class, 'performance'])->name('performance');
+            Route::get('/realtime', [DashboardController::class, 'realtime'])->name('realtime');
+            Route::get('/export', [DashboardController::class, 'export'])->name('export');
+        });
+
+        // Redirection vers le dashboard après connexion
+        Route::get('/admin', function () {
+            return redirect()->route('admin.dashboard.index');
+        })->name('admin');
+
         // ===== GESTION DES DISTRIBUTEURS =====
         Route::prefix('distributeurs')->name('distributeurs.')->group(function () {
 

@@ -1,270 +1,279 @@
 <?php
+// app/Services/CumulManagementService.php
 
 namespace App\Services;
 
 use App\Models\Distributeur;
 use App\Models\LevelCurrent;
+use App\Models\Achat;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Cache;
 
 class CumulManagementService
 {
     /**
-     * Gère le transfert des cumuls lors de la suppression d'un distributeur
+     * Propage un montant dans toute la chaîne parentale
+     *
+     * @param int $distributeurId ID du distributeur source
+     * @param float $amount Montant à propager
+     * @param string $period Période concernée
      */
-    public function handleDistributeurDeletion(Distributeur $distributeur, ?string $period = null): array
+    public function propagateToParents(int $distributeurId, float $amount, string $period): void
     {
-        // Utiliser la période courante si non spécifiée
-        $period = $period ?: date('Y-m');
-
-        $result = [
-            'success' => false,
-            'transferred_amount' => 0,
-            'affected_parent' => null,
-            'message' => ''
-        ];
-
-        try {
-            // Vérifier si le distributeur a un parent
-            if (!$distributeur->id_distrib_parent) {
-                $result['message'] = 'Distributeur sans parent, pas de transfert nécessaire';
-                $result['success'] = true;
-                return $result;
-            }
-
-            // Récupérer les cumuls du distributeur à supprimer
-            $levelCurrent = LevelCurrent::where('distributeur_id', $distributeur->id)
-                                        ->where('period', $period)
-                                        ->first();
-
-            if (!$levelCurrent || $levelCurrent->cumul_individuel == 0) {
-                $result['message'] = 'Aucun cumul individuel à transférer pour cette période';
-                $result['success'] = true;
-                return $result;
-            }
-
-            // Transférer le cumul individuel au parent
-            DB::transaction(function() use ($distributeur, $levelCurrent, $period, &$result) {
-                // Mettre à jour le cumul individuel du parent
-                $parentUpdated = LevelCurrent::where('distributeur_id', $distributeur->id_distrib_parent)
-                                             ->where('period', $period)
-                                             ->increment('cumul_individuel', $levelCurrent->cumul_individuel);
-
-                if (!$parentUpdated) {
-                    // Si le parent n'a pas d'enregistrement pour cette période, le créer
-                    $parent = Distributeur::find($distributeur->id_distrib_parent);
-                    if ($parent) {
-                        LevelCurrent::create([
-                            'distributeur_id' => $parent->id,
-                            'period' => $period,
-                            'rang' => 0,
-                            'etoiles' => $parent->etoiles_id,
-                            'cumul_individuel' => $levelCurrent->cumul_individuel,
-                            'new_cumul' => 0,
-                            'cumul_total' => $levelCurrent->cumul_individuel,
-                            'cumul_collectif' => $levelCurrent->cumul_individuel,
-                            'id_distrib_parent' => $parent->id_distrib_parent
-                        ]);
-                    }
-                }
-
-                // Réassigner les enfants au parent du distributeur supprimé
-                if ($distributeur->children()->exists()) {
-                    Distributeur::where('id_distrib_parent', $distributeur->id)
-                                ->update(['id_distrib_parent' => $distributeur->id_distrib_parent]);
-
-                    // Mettre à jour les level_currents des enfants
-                    LevelCurrent::where('id_distrib_parent', $distributeur->id)
-                                ->where('period', $period)
-                                ->update(['id_distrib_parent' => $distributeur->id_distrib_parent]);
-                }
-
-                $result['success'] = true;
-                $result['transferred_amount'] = $levelCurrent->cumul_individuel;
-                $result['affected_parent'] = $distributeur->id_distrib_parent;
-                $result['message'] = "Cumul individuel de {$levelCurrent->cumul_individuel} transféré avec succès";
-            });
-
-            // Log de l'opération
-            Log::info("Transfert cumuls suppression distributeur", [
-                'distributeur_id' => $distributeur->id,
-                'matricule' => $distributeur->distributeur_id,
-                'parent_id' => $distributeur->id_distrib_parent,
-                'period' => $period,
-                'amount_transferred' => $result['transferred_amount']
-            ]);
-
-        } catch (\Exception $e) {
-            Log::error("Erreur transfert cumuls suppression", [
-                'distributeur_id' => $distributeur->id,
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
-            ]);
-
-            $result['message'] = "Erreur lors du transfert: " . $e->getMessage();
+        // Récupérer le distributeur source
+        $distributeur = Distributeur::find($distributeurId);
+        if (!$distributeur || !$distributeur->id_distrib_parent) {
+            return; // Pas de parent, rien à propager
         }
 
-        return $result;
+        // Parcourir la chaîne parentale
+        $currentParentId = $distributeur->id_distrib_parent;
+        $visitedParents = []; // Protection contre les boucles infinies
+        $maxDepth = 50; // Limite de profondeur
+        $depth = 0;
+
+        while ($currentParentId && !in_array($currentParentId, $visitedParents) && $depth < $maxDepth) {
+            $visitedParents[] = $currentParentId;
+
+            // Mettre à jour le cumul_collectif du parent
+            $this->updateParentCumuls($currentParentId, $amount, $period);
+
+            // Récupérer le parent du parent
+            $parent = Distributeur::find($currentParentId);
+            $currentParentId = $parent ? $parent->id_distrib_parent : null;
+            $depth++;
+        }
+
+        Log::info("Propagation terminée", [
+            'source' => $distributeurId,
+            'amount' => $amount,
+            'period' => $period,
+            'parents_updated' => count($visitedParents),
+            'max_depth_reached' => $depth >= $maxDepth
+        ]);
     }
 
     /**
-     * Recalcule les cumuls collectifs après un changement de parent
+     * Met à jour les cumuls d'un parent
      */
-    public function recalculateAfterParentChange(
-        Distributeur $distributeur,
-        int $oldParentId,
-        int $newParentId,
-        ?string $period = null
-    ): array {
-        $period = $period ?: date('Y-m');
+    protected function updateParentCumuls(int $parentId, float $amount, string $period): void
+    {
+        // Récupérer ou créer le level_current du parent
+        $levelCurrent = LevelCurrent::firstOrCreate(
+            [
+                'distributeur_id' => $parentId,
+                'period' => $period
+            ],
+            [
+                'rang' => 0,
+                'etoiles' => 1,
+                'cumul_individuel' => 0,
+                'new_cumul' => 0,
+                'cumul_total' => 0,
+                'cumul_collectif' => 0,
+                'id_distrib_parent' => Distributeur::find($parentId)->id_distrib_parent
+            ]
+        );
 
-        $result = [
-            'success' => false,
-            'old_parent_updated' => false,
-            'new_parent_updated' => false,
-            'amount_moved' => 0,
-            'message' => ''
-        ];
+        // Incrémenter le cumul_collectif (qui inclut les ventes de toute la descendance)
+        $levelCurrent->increment('cumul_collectif', $amount);
 
+        // Le cumul_total de la période inclut aussi les ventes des filleuls
+        $levelCurrent->increment('cumul_total', $amount);
+
+        Log::debug("Cumuls parent mis à jour", [
+            'parent_id' => $parentId,
+            'period' => $period,
+            'amount_added' => $amount,
+            'new_cumul_collectif' => $levelCurrent->cumul_collectif,
+            'new_cumul_total' => $levelCurrent->cumul_total
+        ]);
+    }
+
+    /**
+     * Recalcule tous les cumuls collectifs pour une période (utile pour corrections)
+     */
+    public function recalculateAllCollectiveCumuls(string $period): array
+    {
+        $startTime = microtime(true);
+        $processedCount = 0;
+
+        DB::beginTransaction();
         try {
-            // Calculer le total de la branche qui bouge
-            $branchTotal = $this->calculateBranchTotal($distributeur->id, $period);
+            // 1. Réinitialiser tous les cumul_collectif à la valeur du cumul_individuel
+            LevelCurrent::where('period', $period)
+                       ->update([
+                           'cumul_collectif' => DB::raw('cumul_individuel'),
+                           'cumul_total' => DB::raw('new_cumul')
+                       ]);
 
-            if ($branchTotal == 0) {
-                $result['message'] = 'Aucun cumul à déplacer pour cette période';
-                $result['success'] = true;
-                return $result;
+            // 2. Récupérer tous les distributeurs ayant des ventes
+            $distributorsWithSales = LevelCurrent::where('period', $period)
+                                                ->where('new_cumul', '>', 0)
+                                                ->orderBy('distributeur_id')
+                                                ->get();
+
+            // 3. Pour chaque distributeur, propager ses ventes dans sa chaîne parentale
+            foreach ($distributorsWithSales as $level) {
+                $this->propagateToParents(
+                    $level->distributeur_id,
+                    $level->new_cumul,
+                    $period
+                );
+                $processedCount++;
             }
 
-            DB::transaction(function() use ($oldParentId, $newParentId, $branchTotal, $period, &$result) {
-                // 1. Soustraire de l'ancienne ligne parentale
-                if ($oldParentId) {
-                    $this->updateParentChainCumuls($oldParentId, -$branchTotal, $period);
-                    $result['old_parent_updated'] = true;
-                }
+            DB::commit();
 
-                // 2. Ajouter à la nouvelle ligne parentale
-                if ($newParentId) {
-                    $this->updateParentChainCumuls($newParentId, $branchTotal, $period);
-                    $result['new_parent_updated'] = true;
-                }
+            $duration = round(microtime(true) - $startTime, 2);
 
-                $result['success'] = true;
-                $result['amount_moved'] = $branchTotal;
-                $result['message'] = "Cumuls recalculés avec succès";
-            });
-
-            Log::info("Recalcul cumuls après changement parent", [
-                'distributeur_id' => $distributeur->id,
-                'old_parent' => $oldParentId,
-                'new_parent' => $newParentId,
-                'period' => $period,
-                'amount_moved' => $result['amount_moved']
-            ]);
+            return [
+                'success' => true,
+                'message' => "Recalcul terminé en {$duration}s",
+                'processed' => $processedCount
+            ];
 
         } catch (\Exception $e) {
-            Log::error("Erreur recalcul cumuls changement parent", [
-                'distributeur_id' => $distributeur->id,
+            DB::rollBack();
+            Log::error("Erreur lors du recalcul des cumuls collectifs", [
+                'period' => $period,
                 'error' => $e->getMessage()
             ]);
 
-            $result['message'] = "Erreur lors du recalcul: " . $e->getMessage();
+            return [
+                'success' => false,
+                'message' => 'Erreur: ' . $e->getMessage()
+            ];
         }
-
-        return $result;
     }
 
     /**
-     * Calcule le total d'une branche (distributeur + tous ses descendants)
+     * Gère la suppression d'un distributeur et le transfert de ses cumuls
      */
-    private function calculateBranchTotal(int $distributeurId, string $period): float
+    public function handleDistributeurDeletion(Distributeur $distributeur, string $currentPeriod): array
     {
-        // Récupérer le cumul_total du distributeur pour cette période
-        $levelCurrent = LevelCurrent::where('distributeur_id', $distributeurId)
-                                    ->where('period', $period)
-                                    ->first();
+        DB::beginTransaction();
+        try {
+            $parentId = $distributeur->id_distrib_parent;
+            $transferredAmount = 0;
 
-        // Le cumul_total représente déjà tout l'effort de la branche pour la période
-        return $levelCurrent ? $levelCurrent->cumul_total : 0;
-    }
+            if ($parentId) {
+                // Récupérer le cumul_collectif du distributeur à supprimer
+                $levelCurrent = LevelCurrent::where('distributeur_id', $distributeur->id)
+                                          ->where('period', $currentPeriod)
+                                          ->first();
 
-    /**
-     * Met à jour les cumuls de toute la chaîne parentale
-     */
-    private function updateParentChainCumuls(int $startParentId, float $amount, string $period): void
-    {
-        $currentParentId = $startParentId;
-        $visited = [];
+                if ($levelCurrent && $levelCurrent->cumul_collectif > 0) {
+                    // Transférer le cumul au parent
+                    $parentLevel = LevelCurrent::firstOrCreate(
+                        [
+                            'distributeur_id' => $parentId,
+                            'period' => $currentPeriod
+                        ],
+                        [
+                            'rang' => 0,
+                            'etoiles' => 1,
+                            'cumul_individuel' => 0,
+                            'new_cumul' => 0,
+                            'cumul_total' => 0,
+                            'cumul_collectif' => 0,
+                            'id_distrib_parent' => Distributeur::find($parentId)->id_distrib_parent
+                        ]
+                    );
 
-        while ($currentParentId && !in_array($currentParentId, $visited)) {
-            $visited[] = $currentParentId;
-
-            // Mettre à jour cumul_total (période courante) et cumul_collectif (cumulatif)
-            $updated = LevelCurrent::where('distributeur_id', $currentParentId)
-                                   ->where('period', $period)
-                                   ->update([
-                                       'cumul_total' => DB::raw("cumul_total + {$amount}"),
-                                       'cumul_collectif' => DB::raw("cumul_collectif + {$amount}")
-                                   ]);
-
-            if (!$updated) {
-                // Si pas d'enregistrement, en créer un
-                $parent = Distributeur::find($currentParentId);
-                if ($parent) {
-                    LevelCurrent::create([
-                        'distributeur_id' => $parent->id,
-                        'period' => $period,
-                        'rang' => 0,
-                        'etoiles' => $parent->etoiles_id,
-                        'cumul_individuel' => 0,
-                        'new_cumul' => 0,
-                        'cumul_total' => max(0, $amount),
-                        'cumul_collectif' => max(0, $amount),
-                        'id_distrib_parent' => $parent->id_distrib_parent
-                    ]);
+                    $parentLevel->increment('cumul_collectif', $levelCurrent->cumul_collectif);
+                    $transferredAmount = $levelCurrent->cumul_collectif;
                 }
+
+                // Réaffecter tous les enfants directs au parent
+                Distributeur::where('id_distrib_parent', $distributeur->id)
+                          ->update(['id_distrib_parent' => $parentId]);
+
+                // Mettre à jour aussi dans level_currents
+                LevelCurrent::where('id_distrib_parent', $distributeur->id)
+                          ->update(['id_distrib_parent' => $parentId]);
             }
 
-            // Monter au parent suivant
-            $parent = Distributeur::find($currentParentId);
-            $currentParentId = $parent ? $parent->id_distrib_parent : null;
+            DB::commit();
+
+            return [
+                'success' => true,
+                'transferred_amount' => $transferredAmount,
+                'affected_parent' => $parentId,
+                'message' => "Cumuls transférés avec succès"
+            ];
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return [
+                'success' => false,
+                'message' => 'Erreur lors du transfert: ' . $e->getMessage()
+            ];
         }
     }
 
     /**
-     * Recalcule les cumuls individuels d'un distributeur
-     * (cumul_individuel = cumul_total - somme des cumul_total des enfants directs)
+     * Optimise la récupération de l'arbre hiérarchique avec cache
      */
-    public function recalculateIndividualCumul(int $distributeurId, string $period): float
+    public function getHierarchyTree(int $distributeurId, int $maxDepth = 3): array
     {
-        $levelCurrent = LevelCurrent::where('distributeur_id', $distributeurId)
-                                    ->where('period', $period)
-                                    ->first();
+        $cacheKey = "hierarchy_{$distributeurId}_depth_{$maxDepth}";
 
-        if (!$levelCurrent) {
-            return 0;
+        return Cache::remember($cacheKey, 3600, function() use ($distributeurId, $maxDepth) {
+            return $this->buildHierarchyTree($distributeurId, 0, $maxDepth);
+        });
+    }
+
+    /**
+     * Construit récursivement l'arbre hiérarchique
+     */
+    protected function buildHierarchyTree(int $distributeurId, int $currentDepth, int $maxDepth): array
+    {
+        if ($currentDepth >= $maxDepth) {
+            return [];
         }
 
-        // Somme des cumul_total des enfants directs
-        $childrenTotal = LevelCurrent::where('id_distrib_parent', $distributeurId)
-                                     ->where('period', $period)
-                                     ->sum('cumul_total');
+        $children = Distributeur::where('id_distrib_parent', $distributeurId)
+                              ->select('id', 'distributeur_id', 'nom_distributeur', 'pnom_distributeur', 'etoiles_id')
+                              ->get();
 
-        // Calcul du cumul individuel
-        $newIndividualCumul = $levelCurrent->cumul_total - $childrenTotal;
-
-        // Mettre à jour si différent
-        if ($levelCurrent->cumul_individuel != $newIndividualCumul) {
-            $levelCurrent->update(['cumul_individuel' => $newIndividualCumul]);
-
-            Log::info("Recalcul cumul individuel", [
-                'distributeur_id' => $distributeurId,
-                'period' => $period,
-                'old_value' => $levelCurrent->cumul_individuel,
-                'new_value' => $newIndividualCumul
-            ]);
+        $tree = [];
+        foreach ($children as $child) {
+            $tree[] = [
+                'id' => $child->id,
+                'matricule' => $child->distributeur_id,
+                'nom' => $child->nom_distributeur . ' ' . $child->pnom_distributeur,
+                'grade' => $child->etoiles_id,
+                'children' => $this->buildHierarchyTree($child->id, $currentDepth + 1, $maxDepth)
+            ];
         }
 
-        return $newIndividualCumul;
+        return $tree;
+    }
+
+    /**
+     * Invalide le cache pour un distributeur et ses parents
+     */
+    public function invalidateHierarchyCache(int $distributeurId): void
+    {
+        // Invalider le cache du distributeur
+        Cache::forget("hierarchy_{$distributeurId}_*");
+
+        // Invalider le cache de tous ses parents
+        $currentId = $distributeurId;
+        $maxDepth = 20;
+        $depth = 0;
+
+        while ($currentId && $depth < $maxDepth) {
+            $parent = Distributeur::find($currentId);
+            if ($parent && $parent->id_distrib_parent) {
+                Cache::forget("hierarchy_{$parent->id_distrib_parent}_*");
+                $currentId = $parent->id_distrib_parent;
+            } else {
+                break;
+            }
+            $depth++;
+        }
     }
 }
