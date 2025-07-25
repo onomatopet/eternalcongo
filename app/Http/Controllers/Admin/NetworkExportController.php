@@ -63,6 +63,37 @@ class NetworkExportController extends Controller
     }
 
     /**
+     * Affiche l'aperçu du réseau avant impression
+     */
+    public function exportHtml(Request $request)
+    {
+        $request->validate([
+            'distributeur_id' => 'required|exists:distributeurs,distributeur_id',
+            'period' => 'required|string|size:7'
+        ]);
+
+        $distributeurId = $request->distributeur_id;
+        $period = $request->period;
+
+        // Récupérer les données du réseau
+        $networkData = $this->getNetworkData($distributeurId, $period);
+
+        if (empty($networkData)) {
+            return back()->with('error', 'Aucune donnée trouvée pour ce distributeur et cette période.');
+        }
+
+        // Informations du distributeur principal
+        $mainDistributor = Distributeur::where('distributeur_id', $distributeurId)->first();
+
+        return view('admin.network.imprimable', [
+            'distributeurs' => $networkData,
+            'mainDistributor' => $mainDistributor,
+            'period' => $period,
+            'totalCount' => count($networkData)
+        ]);
+    }
+
+    /**
      * Export en PDF
      */
     public function exportPdf(Request $request)
@@ -253,5 +284,54 @@ class NetworkExportController extends Controller
         });
 
         return response()->json($results);
+    }
+
+    /**
+     * Recherche AJAX des périodes disponibles dans la table achats
+     */
+    public function searchPeriods(Request $request)
+    {
+        $query = $request->get('q', '');
+
+        // Si la recherche est vide, retourner les 12 dernières périodes
+        if (empty($query)) {
+            $periods = Achat::select('period')
+                ->whereNotNull('period')
+                ->where('period', '!=', '')
+                ->groupBy('period')
+                ->orderBy('period', 'desc')
+                ->limit(12)
+                ->pluck('period');
+        } else {
+            // Recherche avec le terme saisi
+            $periods = Achat::select('period')
+                ->whereNotNull('period')
+                ->where('period', '!=', '')
+                ->where('period', 'LIKE', "%{$query}%")
+                ->groupBy('period')
+                ->orderBy('period', 'desc')
+                ->limit(20)
+                ->pluck('period');
+        }
+
+        // Formater les périodes pour l'affichage
+        $formattedPeriods = $periods->map(function($period) {
+            try {
+                $date = Carbon::createFromFormat('Y-m', $period);
+                return [
+                    'value' => $period,
+                    'label' => ucfirst($date->locale('fr')->isoFormat('MMMM YYYY')),
+                    'year' => $date->year
+                ];
+            } catch (\Exception $e) {
+                // Si le format n'est pas valide, ignorer cette période
+                return null;
+            }
+        })->filter()->values();
+
+        // Grouper par année
+        $groupedPeriods = $formattedPeriods->groupBy('year')->sortKeysDesc();
+
+        return response()->json($groupedPeriods);
     }
 }

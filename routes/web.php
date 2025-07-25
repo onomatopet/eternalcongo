@@ -281,10 +281,12 @@ Route::middleware(['auth', 'verified', 'check_admin_role'])
         Route::prefix('network')->name('network.')->group(function () {
             Route::get('/', [NetworkExportController::class, 'index'])->name('index');
 
-            // AJOUTER CETTE ROUTE pour la recherche AJAX
+            // Routes pour la recherche AJAX
             Route::get('/search/distributeurs', [NetworkExportController::class, 'searchDistributeurs'])->name('search.distributeurs');
+            Route::get('/search/periods', [NetworkExportController::class, 'searchPeriods'])->name('search.periods');
 
             Route::get('/export', [NetworkExportController::class, 'export'])->name('export');
+            Route::post('/export-html', [NetworkExportController::class, 'exportHtml'])->name('export.html');
             Route::post('/export-pdf', [NetworkExportController::class, 'exportPdf'])->name('export.pdf');
             Route::post('/export-excel', [NetworkExportController::class, 'exportExcel'])->name('export.excel');
         });

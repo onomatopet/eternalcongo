@@ -113,62 +113,107 @@
 
                 {{-- Étape 2: Sélection de la période --}}
                 <div class="bg-white shadow-lg rounded-lg">
-                    <div class="bg-gradient-to-r from-indigo-500 to-indigo-600 px-6 py-4 rounded-t-lg">
+                    <div class="bg-gradient-to-r from-green-500 to-green-600 px-6 py-4 rounded-t-lg">
                         <div class="flex items-center">
-                            <span class="flex-shrink-0 w-8 h-8 bg-white bg-opacity-20 rounded-full flex items-center justify-center text-white font-semibold mr-3">2</span>
-                            <h2 class="text-lg font-semibold text-white">Choisir la période</h2>
+                            <div class="flex-shrink-0 bg-white/20 p-3 rounded-lg">
+                                <svg class="h-6 w-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                                </svg>
+                            </div>
+                            <div class="ml-4">
+                                <h2 class="text-xl font-semibold text-white">Étape 2 : Choisir la période</h2>
+                                <p class="text-green-100 text-sm">Sélectionnez le mois pour l'export</p>
+                            </div>
                         </div>
                     </div>
 
                     <div class="p-6">
-                        <label for="period" class="block text-sm font-medium text-gray-700 mb-3">
-                            Sélectionnez le mois à analyser
+                        <label class="block text-sm font-medium text-gray-700 mb-2">
+                            Sélectionnez une période :
                         </label>
 
-                        {{-- Grille de périodes moderne --}}
-                        <div class="grid grid-cols-3 gap-3 mb-4">
-                            @php
-                                $displayedPeriods = $periods->take(6);
-                                $remainingPeriods = $periods->skip(6);
-                            @endphp
-
-                            @foreach($displayedPeriods as $period)
-                                <label class="period-option cursor-pointer">
-                                    <input type="radio" name="period" value="{{ $period }}" class="hidden period-radio" required>
-                                    <div class="border-2 border-gray-200 rounded-lg p-3 text-center hover:border-blue-500 hover:bg-blue-50 transition-all duration-200">
-                                        <div class="text-sm font-medium text-gray-900">
-                                            {{ \Carbon\Carbon::createFromFormat('Y-m', $period)->locale('fr')->isoFormat('MMMM') }}
-                                        </div>
-                                        <div class="text-xs text-gray-500">
-                                            {{ \Carbon\Carbon::createFromFormat('Y-m', $period)->year }}
-                                        </div>
-                                    </div>
-                                </label>
-                            @endforeach
-                        </div>
-
-                        {{-- Autres périodes dans un select moderne --}}
-                        @if($remainingPeriods->count() > 0)
+                        {{-- Liste déroulante searchable avec Alpine.js et recherche DB --}}
+                        <div x-data="periodSelector()" class="relative">
                             <div class="relative">
-                                <select id="other_periods" class="w-full appearance-none bg-gray-50 border border-gray-300 text-gray-900 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent px-4 py-3 pr-10">
-                                    <option value="">-- Autres périodes disponibles --</option>
-                                    @foreach($remainingPeriods as $period)
-                                        <option value="{{ $period }}">
-                                            {{ \Carbon\Carbon::createFromFormat('Y-m', $period)->locale('fr')->isoFormat('MMMM YYYY') }}
-                                        </option>
-                                    @endforeach
-                                </select>
-                                <div class="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-                                    <svg class="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                                {{-- Input de recherche qui affiche la sélection --}}
+                                <input type="text"
+                                       x-model="search"
+                                       @click="openDropdown()"
+                                       @input="searchPeriods()"
+                                       @keydown.escape="open = false"
+                                       class="w-full px-4 py-3 pr-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                       placeholder="Tapez pour rechercher une période..."
+                                       autocomplete="off">
+
+                                {{-- Icône dropdown --}}
+                                <button type="button"
+                                        @click="toggleDropdown()"
+                                        class="absolute inset-y-0 right-0 flex items-center pr-3">
+                                    <svg class="w-5 h-5 text-gray-400" :class="{'rotate-180': open}"
+                                         fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                                         style="transition: transform 0.2s;">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
                                     </svg>
+                                </button>
+
+                                {{-- Input hidden pour le formulaire --}}
+                                <input type="hidden" name="period" :value="selectedValue">
+                            </div>
+
+                            {{-- Liste déroulante --}}
+                            <div x-show="open"
+                                 @click.away="open = false"
+                                 x-transition:enter="transition ease-out duration-200"
+                                 x-transition:enter-start="opacity-0 scale-95"
+                                 x-transition:enter-end="opacity-100 scale-100"
+                                 x-transition:leave="transition ease-in duration-150"
+                                 x-transition:leave-start="opacity-100 scale-100"
+                                 x-transition:leave-end="opacity-0 scale-95"
+                                 class="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-auto"
+                                 style="display: none;">
+
+                                {{-- Loader pendant la recherche --}}
+                                <div x-show="loading" class="p-4 text-center">
+                                    <svg class="animate-spin h-5 w-5 mx-auto text-gray-400" fill="none" viewBox="0 0 24 24">
+                                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                                    </svg>
+                                    <p class="mt-2 text-sm text-gray-500">Recherche en cours...</p>
+                                </div>
+
+                                {{-- Résultats --}}
+                                <div x-show="!loading">
+                                    <template x-for="(yearGroup, year) in filteredPeriods" :key="year">
+                                        <div>
+                                            {{-- En-tête de l'année --}}
+                                            <div class="px-3 py-2 text-xs font-semibold text-gray-500 bg-gray-50 sticky top-0"
+                                                 x-text="year"></div>
+
+                                            {{-- Mois de l'année --}}
+                                            <template x-for="period in yearGroup" :key="period.value">
+                                                <button type="button"
+                                                        @click="selectPeriod(period)"
+                                                        class="w-full px-4 py-2 text-left hover:bg-blue-50 focus:bg-blue-50 focus:outline-none"
+                                                        :class="{'bg-blue-100': selectedValue === period.value}">
+                                                    <span x-text="period.label" class="block text-sm text-gray-900"></span>
+                                                    <span x-text="period.value" class="block text-xs text-gray-500"></span>
+                                                </button>
+                                            </template>
+                                        </div>
+                                    </template>
+
+                                    {{-- Message si aucun résultat --}}
+                                    <div x-show="Object.keys(filteredPeriods).length === 0 && !loading"
+                                         class="px-4 py-3 text-sm text-gray-500 text-center">
+                                        Aucune période trouvée dans la base de données
+                                    </div>
                                 </div>
                             </div>
-                        @endif
+                        </div>
 
-                        @error('period')
-                            <p class="mt-2 text-sm text-red-600">{{ $message }}</p>
-                        @enderror
+                        <p class="mt-2 text-sm text-gray-500">
+                            Les périodes affichées sont celles qui contiennent des données dans la base
+                        </p>
                     </div>
                 </div>
 
@@ -180,7 +225,7 @@
                             <h3 class="text-sm font-medium text-gray-900 mb-3">Options d'export</h3>
                             <div class="space-y-3">
                                 <label class="flex items-center cursor-pointer group">
-                                    <input type="checkbox" name="include_inactive" value="1"
+                                    <input type="checkbox" name="include_inactive" value="1" checked
                                            class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500">
                                     <span class="ml-3 text-sm text-gray-700 group-hover:text-gray-900">
                                         Inclure les distributeurs inactifs
