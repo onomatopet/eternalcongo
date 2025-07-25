@@ -122,6 +122,10 @@ Route::middleware(['auth', 'verified', 'check_admin_role'])
             Route::get('/', [DistributeurController::class, 'index'])->name('index');
             Route::get('/create', [DistributeurController::class, 'create'])->name('create');
             Route::post('/', [DistributeurController::class, 'store'])->name('store');
+
+            // AJOUT DE LA ROUTE DE RECHERCHE ICI
+            Route::get('/search', [DistributeurController::class, 'search'])->name('search');
+
             Route::get('/{distributeur}', [DistributeurController::class, 'show'])->name('show');
             Route::get('/{distributeur}/edit', [DistributeurController::class, 'edit'])->name('edit');
             Route::put('/{distributeur}', [DistributeurController::class, 'update'])->name('update');
@@ -129,6 +133,7 @@ Route::middleware(['auth', 'verified', 'check_admin_role'])
 
             // Actions spécifiques
             Route::post('/{distributeur}/request-deletion', [DistributeurController::class, 'requestDeletion'])->name('request-deletion');
+            Route::get('/{distributeur}/confirm-deletion', [DistributeurController::class, 'confirmDeletion'])->name('confirm-deletion');
             Route::get('/{distributeur}/network', [DistributeurController::class, 'network'])->name('network');
             Route::get('/{distributeur}/stats', [DistributeurController::class, 'stats'])->name('stats');
         });

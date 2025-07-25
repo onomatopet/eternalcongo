@@ -12,6 +12,7 @@ use App\Models\Bonus;
 use App\Services\DashboardService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Log;
 use Carbon\Carbon;
 
@@ -284,19 +285,70 @@ class DashboardController extends Controller
     }
 
     /**
-     * Récupérer les statistiques de bonus
+     * Récupérer les statistiques des bonus
      */
     private function getBonusStatistics($period)
     {
-        return [
-            'total_distributed' => Bonus::where('period', $period)->sum('montant'),
-            'average_bonus' => Bonus::where('period', $period)->avg('montant'),
-            'beneficiaries' => Bonus::where('period', $period)->distinct('distributeur_id')->count(),
-            'by_type' => Bonus::select('type_bonus', DB::raw('SUM(montant) as total'))
-                ->where('period', $period)
+        $bonusStats = [];
+
+        // Vérifier quelles colonnes existent dans la table bonuses
+        $hasTypeBonusColumn = Schema::hasColumn('bonuses', 'type_bonus');
+        $hasDetailedColumns = Schema::hasColumn('bonuses', 'montant_direct') &&
+                            Schema::hasColumn('bonuses', 'montant_indirect') &&
+                            Schema::hasColumn('bonuses', 'montant_leadership');
+
+        if ($hasDetailedColumns) {
+            // Utiliser les nouvelles colonnes détaillées
+            $stats = Bonus::where('period', $period)
+                ->selectRaw('
+                    SUM(montant_direct) as total_direct,
+                    SUM(montant_indirect) as total_indirect,
+                    SUM(montant_leadership) as total_leadership,
+                    SUM(COALESCE(montant_total, montant)) as total_all,
+                    COUNT(DISTINCT distributeur_id) as beneficiaires,
+                    AVG(COALESCE(montant_total, montant)) as moyenne
+                ')
+                ->first();
+
+            $bonusStats = [
+                'total' => $stats->total_all ?? 0,
+                'beneficiaires' => $stats->beneficiaires ?? 0,
+                'moyenne' => $stats->moyenne ?? 0,
+                'par_type' => [
+                    ['type' => 'Bonus Direct', 'total' => $stats->total_direct ?? 0],
+                    ['type' => 'Bonus Indirect', 'total' => $stats->total_indirect ?? 0],
+                    ['type' => 'Bonus Leadership', 'total' => $stats->total_leadership ?? 0],
+                ]
+            ];
+        } elseif ($hasTypeBonusColumn) {
+            // Utiliser l'ancienne colonne type_bonus si elle existe
+            $bonusStats = Bonus::where('period', $period)
+                ->selectRaw('type_bonus, SUM(montant) as total')
                 ->groupBy('type_bonus')
                 ->get()
-        ];
+                ->mapWithKeys(function ($item) {
+                    return [$item->type_bonus => $item->total];
+                })
+                ->toArray();
+        } else {
+            // Fallback : calculer les totaux sans types
+            $stats = Bonus::where('period', $period)
+                ->selectRaw('
+                    COUNT(DISTINCT distributeur_id) as beneficiaires,
+                    SUM(COALESCE(montant, bonus)) as total,
+                    AVG(COALESCE(montant, bonus)) as moyenne
+                ')
+                ->first();
+
+            $bonusStats = [
+                'total' => $stats->total ?? 0,
+                'beneficiaires' => $stats->beneficiaires ?? 0,
+                'moyenne' => $stats->moyenne ?? 0,
+                'par_type' => []
+            ];
+        }
+
+        return $bonusStats;
     }
 
     /**
@@ -333,17 +385,24 @@ class DashboardController extends Controller
             ]);
         }
 
-        // Alerte si période non clôturée
+        // Alerte si période non clôturée - CORRECTION ICI
         $lastMonth = Carbon::now()->subMonth()->format('Y-m');
-        $hasUnclosedPeriod = LevelCurrent::where('period', $lastMonth)
-            ->whereNull('closed_at')
-            ->exists();
 
-        if ($hasUnclosedPeriod) {
+        // Utiliser SystemPeriod pour vérifier si la période est fermée
+        $systemPeriod = \App\Models\SystemPeriod::where('period', $lastMonth)->first();
+
+        if ($systemPeriod && $systemPeriod->status !== \App\Models\SystemPeriod::STATUS_CLOSED) {
             $alerts->push([
                 'type' => 'error',
                 'title' => 'Période non clôturée',
                 'message' => "La période {$lastMonth} doit être clôturée"
+            ]);
+        } elseif (!$systemPeriod && Carbon::now()->day > 10) {
+            // Si on est après le 10 du mois et que la période n'existe pas
+            $alerts->push([
+                'type' => 'warning',
+                'title' => 'Période manquante',
+                'message' => "La période {$lastMonth} n'a pas été créée dans le système"
             ]);
         }
 

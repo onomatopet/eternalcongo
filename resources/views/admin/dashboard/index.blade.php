@@ -115,13 +115,19 @@
             {{-- Evolution des ventes --}}
             <div class="bg-white p-6 rounded-lg shadow">
                 <h2 class="text-lg font-medium text-gray-900 mb-4">Evolution des ventes</h2>
-                <canvas id="salesChart" height="300"></canvas>
+                {{-- CORRECTION: Ajouter un conteneur avec hauteur fixe --}}
+                <div style="position: relative; height: 300px;">
+                    <canvas id="salesChart"></canvas>
+                </div>
             </div>
 
             {{-- Distribution des grades --}}
             <div class="bg-white p-6 rounded-lg shadow">
                 <h2 class="text-lg font-medium text-gray-900 mb-4">Distribution des grades</h2>
-                <canvas id="gradeChart" height="300"></canvas>
+                {{-- CORRECTION: Ajouter un conteneur avec hauteur fixe --}}
+                <div style="position: relative; height: 300px;">
+                    <canvas id="gradeChart"></canvas>
+                </div>
             </div>
         </div>
 
@@ -215,23 +221,28 @@
                     <div class="flow-root">
                         <ul class="-my-3 divide-y divide-gray-200">
                             @foreach($dashboardData['recent_activity']['recent_registrations'] as $registration)
-                                <li class="py-3">
-                                    <div class="flex items-center space-x-4">
-                                        <div class="flex-1 min-w-0">
-                                            <p class="text-sm font-medium text-gray-900 truncate">
-                                                {{ $registration['name'] }}
-                                            </p>
-                                            <p class="text-xs text-gray-500">
-                                                Parrain : {{ $registration['sponsor'] }}
-                                            </p>
-                                        </div>
-                                        <div>
-                                            <p class="text-xs text-gray-500">
-                                                {{ $registration['date'] }}
-                                            </p>
-                                        </div>
+                            <li class="py-3">
+                                <div class="flex items-center space-x-4">
+                                    <div class="flex-1 min-w-0">
+                                        <p class="text-sm font-medium text-gray-900 truncate">
+                                            {{ $registration['name'] }}
+                                        </p>
+                                        <p class="text-xs text-gray-500">
+                                            {{-- CORRECTION ICI : Changer 'sponsor' par 'parrain' --}}
+                                            Parrain : {{ $registration['parrain'] ?? 'Aucun' }}
+                                        </p>
                                     </div>
-                                </li>
+                                    <div>
+                                        <p class="text-xs text-gray-500">
+                                            @if(isset($registration['created_at']))
+                                                {{ \Carbon\Carbon::parse($registration['created_at'])->format('d/m/Y') }}
+                                            @else
+                                                N/A
+                                            @endif
+                                        </p>
+                                    </div>
+                                </div>
+                            </li>
                             @endforeach
                         </ul>
                     </div>
@@ -244,111 +255,92 @@
 @push('scripts')
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
-// Graphique évolution des ventes
-const salesCtx = document.getElementById('salesChart').getContext('2d');
-const salesData = @json($dashboardData['charts']['sales_evolution']);
+document.addEventListener('DOMContentLoaded', function() {
+    // S'assurer que les canvas existent
+    const salesCanvas = document.getElementById('salesChart');
+    const gradeCanvas = document.getElementById('gradeChart');
 
-new Chart(salesCtx, {
-    type: 'line',
-    data: {
-        labels: salesData.map(d => d.period),
-        datasets: [{
-            label: 'Chiffre d\'affaires',
-            data: salesData.map(d => d.revenue),
-            borderColor: 'rgb(59, 130, 246)',
-            backgroundColor: 'rgba(59, 130, 246, 0.1)',
-            yAxisID: 'y',
-        }, {
-            label: 'Points',
-            data: salesData.map(d => d.points),
-            borderColor: 'rgb(16, 185, 129)',
-            backgroundColor: 'rgba(16, 185, 129, 0.1)',
-            yAxisID: 'y1',
-        }]
-    },
-    options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        interaction: {
-            mode: 'index',
-            intersect: false,
-        },
-        scales: {
-            y: {
-                type: 'linear',
-                display: true,
-                position: 'left',
-                ticks: {
-                    callback: function(value) {
-                        return value.toLocaleString() + ' €';
-                    }
-                }
-            },
-            y1: {
-                type: 'linear',
-                display: true,
-                position: 'right',
-                grid: {
-                    drawOnChartArea: false,
-                },
-                ticks: {
-                    callback: function(value) {
-                        return value.toLocaleString() + ' PV';
-                    }
-                }
-            },
-        }
+    if (!salesCanvas || !gradeCanvas) {
+        console.error('Canvas elements not found');
+        return;
     }
-});
 
-// Graphique distribution des grades
-const gradeCtx = document.getElementById('gradeChart').getContext('2d');
-const gradeData = @json($dashboardData['charts']['grade_distribution']);
+    // Graphique évolution des ventes
+    const salesCtx = salesCanvas.getContext('2d');
+    const salesData = @json($dashboardData['charts']['sales_evolution'] ?? []);
 
-new Chart(gradeCtx, {
-    type: 'doughnut',
-    data: {
-        labels: gradeData.map(d => d.label),
-        datasets: [{
-            data: gradeData.map(d => d.count),
-            backgroundColor: [
-                '#F87171', '#FB923C', '#FBBF24', '#FDE047',
-                '#A3E635', '#4ADE80', '#34D399', '#2DD4BF',
-                '#22D3EE', '#38BDF8'
-            ]
-        }]
-    },
-    options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-            legend: {
-                position: 'right',
+    if (salesData && salesData.length > 0) {
+        new Chart(salesCtx, {
+            type: 'line',
+            data: {
+                labels: salesData.map(d => d.month || d.period),
+                datasets: [{
+                    label: 'Chiffre d\'affaires',
+                    data: salesData.map(d => parseFloat(d.revenue) || 0),
+                    borderColor: 'rgb(59, 130, 246)',
+                    backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                    yAxisID: 'y',
+                }, {
+                    label: 'Points',
+                    data: salesData.map(d => parseFloat(d.points) || 0),
+                    borderColor: 'rgb(16, 185, 129)',
+                    backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                    yAxisID: 'y1',
+                }]
             },
-            tooltip: {
-                callbacks: {
-                    label: function(context) {
-                        const label = context.label || '';
-                        const value = context.parsed || 0;
-                        const total = context.dataset.data.reduce((a, b) => a + b, 0);
-                        const percentage = ((value / total) * 100).toFixed(1);
-                        return label + ': ' + value + ' (' + percentage + '%)';
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        type: 'linear',
+                        display: true,
+                        position: 'left',
+                    },
+                    y1: {
+                        type: 'linear',
+                        display: true,
+                        position: 'right',
+                        grid: {
+                            drawOnChartArea: false,
+                        },
+                    },
+                }
+            }
+        });
+    }
+
+    // Graphique distribution des grades
+    const gradeCtx = gradeCanvas.getContext('2d');
+    const gradeData = @json($dashboardData['charts']['grade_distribution'] ?? []);
+
+    if (gradeData && gradeData.length > 0) {
+        new Chart(gradeCtx, {
+            type: 'doughnut',
+            data: {
+                labels: gradeData.map(d => d.label || `Grade ${d.grade}`),
+                datasets: [{
+                    data: gradeData.map(d => parseInt(d.count) || 0),
+                    backgroundColor: [
+                        '#F87171', '#FB923C', '#FBBF24', '#FDE047',
+                        '#A3E635', '#4ADE80', '#34D399', '#2DD4BF',
+                        '#22D3EE', '#38BDF8'
+                    ]
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'right',
                     }
                 }
             }
-        }
+        });
     }
 });
-
-// Mise à jour temps réel
-setInterval(function() {
-    fetch('{{ route("admin.dashboard.realtime", ["period" => $period]) }}')
-        .then(response => response.json())
-        .then(data => {
-            // Mettre à jour les éléments temps réel si nécessaire
-            console.log('Realtime update:', data);
-        });
-}, 30000); // Toutes les 30 secondes
 </script>
 @endpush
+
 @endsection
