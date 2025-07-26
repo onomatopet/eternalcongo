@@ -1,5 +1,4 @@
 <?php
-// app/Models/WorkflowLog.php
 
 namespace App\Models;
 
@@ -8,26 +7,6 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class WorkflowLog extends Model
 {
-    protected $fillable = [
-        'period',
-        'step',
-        'action',
-        'status',
-        'user_id',
-        'details',
-        'error_message',
-        'started_at',
-        'completed_at',
-    ];
-
-    protected $casts = [
-        'details' => 'array',
-        'started_at' => 'datetime',
-        'completed_at' => 'datetime',
-        'created_at' => 'datetime',
-        'updated_at' => 'datetime',
-    ];
-
     // Constantes de statut
     const STATUS_STARTED = 'started';
     const STATUS_COMPLETED = 'completed';
@@ -41,69 +20,47 @@ class WorkflowLog extends Model
     const STEP_SNAPSHOT = 'snapshot';
     const STEP_CLOSURE = 'closure';
 
-    // Relations
+    protected $fillable = [
+        'period',
+        'step',
+        'action',
+        'status',
+        'user_id',
+        'started_at',
+        'completed_at',
+        'duration_seconds',
+        'details',
+        'error_message'
+    ];
+
+    protected $casts = [
+        'started_at' => 'datetime',
+        'completed_at' => 'datetime',
+        'details' => 'array'
+    ];
+
+    /**
+     * Relation avec l'utilisateur
+     */
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
     }
 
-    // Accesseurs
-    public function getDurationAttribute(): ?int
-    {
-        if ($this->started_at && $this->completed_at) {
-            return $this->completed_at->diffInSeconds($this->started_at);
-        }
-        return null;
-    }
-
-    public function getDurationForHumansAttribute(): ?string
-    {
-        $duration = $this->duration;
-        if ($duration === null) {
-            return null;
-        }
-
-        if ($duration < 60) {
-            return $duration . ' secondes';
-        } elseif ($duration < 3600) {
-            return round($duration / 60, 1) . ' minutes';
-        } else {
-            return round($duration / 3600, 1) . ' heures';
-        }
-    }
-
-    public function getStatusColorAttribute(): string
-    {
-        return match($this->status) {
-            self::STATUS_STARTED => 'blue',
-            self::STATUS_COMPLETED => 'green',
-            self::STATUS_FAILED => 'red',
-            self::STATUS_SKIPPED => 'gray',
-            default => 'gray'
-        };
-    }
-
-    public function getStatusLabelAttribute(): string
-    {
-        return match($this->status) {
-            self::STATUS_STARTED => 'En cours',
-            self::STATUS_COMPLETED => 'Terminé',
-            self::STATUS_FAILED => 'Échoué',
-            self::STATUS_SKIPPED => 'Ignoré',
-            default => 'Inconnu'
-        };
-    }
-
+    /**
+     * Obtient le label de l'étape
+     */
     public function getStepLabelAttribute(): string
     {
-        return match($this->step) {
-            self::STEP_VALIDATION => 'Validation des achats',
-            self::STEP_AGGREGATION => 'Agrégation des achats',
-            self::STEP_ADVANCEMENT => 'Calcul des avancements',
-            self::STEP_SNAPSHOT => 'Création du snapshot',
-            self::STEP_CLOSURE => 'Clôture de la période',
-            default => $this->step
-        };
+        $labels = [
+            'validation' => 'Validation des achats',
+            'aggregation' => 'Agrégation des achats',
+            'advancement' => 'Calcul des avancements',
+            'snapshot' => 'Création du snapshot',
+            'closing' => 'Clôture de la période'
+        ];
+
+        return $labels[$this->step] ?? $this->step;
     }
 
     // Méthodes statiques
@@ -120,7 +77,6 @@ class WorkflowLog extends Model
         ]);
     }
 
-    // Méthodes d'instance
     public function complete(array $additionalDetails = []): void
     {
         $this->update([
@@ -149,29 +105,55 @@ class WorkflowLog extends Model
         ]);
     }
 
-    // Scopes
-    public function scopeForPeriod($query, string $period)
+    /**
+     * Obtient le label du statut
+     */
+    public function getStatusLabelAttribute(): string
     {
-        return $query->where('period', $period);
+        $labels = [
+            'started' => 'En cours',
+            'completed' => 'Terminé',
+            'failed' => 'Échoué'
+        ];
+
+        return $labels[$this->status] ?? $this->status;
     }
 
-    public function scopeForStep($query, string $step)
+    /**
+     * Obtient la couleur du statut
+     */
+    public function getStatusColorAttribute(): string
     {
-        return $query->where('step', $step);
+        $colors = [
+            'started' => 'yellow',
+            'completed' => 'green',
+            'failed' => 'red'
+        ];
+
+        return $colors[$this->status] ?? 'gray';
     }
 
-    public function scopeCompleted($query)
+    /**
+     * Obtient la durée formatée
+     */
+    public function getDurationForHumansAttribute(): ?string
     {
-        return $query->where('status', self::STATUS_COMPLETED);
-    }
+        if (!$this->duration_seconds) {
+            return null;
+        }
 
-    public function scopeFailed($query)
-    {
-        return $query->where('status', self::STATUS_FAILED);
-    }
+        if ($this->duration_seconds < 60) {
+            return $this->duration_seconds . ' secondes';
+        }
 
-    public function scopeRecent($query, int $days = 7)
-    {
-        return $query->where('created_at', '>=', now()->subDays($days));
+        if ($this->duration_seconds < 3600) {
+            $minutes = floor($this->duration_seconds / 60);
+            $seconds = $this->duration_seconds % 60;
+            return "{$minutes}m {$seconds}s";
+        }
+
+        $hours = floor($this->duration_seconds / 3600);
+        $minutes = floor(($this->duration_seconds % 3600) / 60);
+        return "{$hours}h {$minutes}m";
     }
 }

@@ -515,10 +515,9 @@ class DistributeurController extends Controller
             ]);
 
             // 2. Créer un backup complet
-            $backupResult = $this->backupService->createDeletionBackup(
+            $backupResult = $this->backupService->createBackup(
                 'distributeur',
-                $distributeur->id,
-                $validationResult['related_data'] ?? []
+                $distributeur->id
             );
 
             if (!$backupResult['success']) {
@@ -590,10 +589,9 @@ class DistributeurController extends Controller
             }
 
             // Créer backup
-            $backupResult = $this->backupService->createDeletionBackup(
+            $backupResult = $this->backupService->createBackup(
                 'distributeur',
-                $distributeur->id,
-                $validationResult['related_data'] ?? []
+                $distributeur->id
             );
 
             if (!$backupResult['success']) {
@@ -647,21 +645,25 @@ class DistributeurController extends Controller
     {
         $search = $request->get('q', '');
 
-        // Si la recherche est vide, retourner les 20 premiers distributeurs
         $query = Distributeur::query();
 
-        if (!empty($search)) {
+        // Vérifier si on cherche par ID (format: "id:123")
+        if (strpos($search, 'id:') === 0) {
+            $id = substr($search, 3);
+            $query->where('id', $id);
+        } elseif (!empty($search)) {
+            // Recherche normale
             $query->where(function($q) use ($search) {
                 $q->where('nom_distributeur', 'LIKE', "%{$search}%")
-                  ->orWhere('pnom_distributeur', 'LIKE', "%{$search}%")
-                  ->orWhere('distributeur_id', 'LIKE', "%{$search}%")
-                  ->orWhere('tel_distributeur', 'LIKE', "%{$search}%");
+                ->orWhere('pnom_distributeur', 'LIKE', "%{$search}%")
+                ->orWhere('distributeur_id', 'LIKE', "%{$search}%")
+                ->orWhere('tel_distributeur', 'LIKE', "%{$search}%");
             });
         }
 
         $distributeurs = $query->orderBy('nom_distributeur')
-                              ->limit(20)
-                              ->get(['id', 'distributeur_id', 'nom_distributeur', 'pnom_distributeur', 'tel_distributeur']);
+                            ->limit(20)
+                            ->get(['id', 'distributeur_id', 'nom_distributeur', 'pnom_distributeur', 'tel_distributeur']);
 
         // Formater les résultats pour Select2/Ajax
         $results = $distributeurs->map(function($dist) {

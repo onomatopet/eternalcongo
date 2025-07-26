@@ -17,6 +17,7 @@ use App\Http\Controllers\Admin\ModificationRequestController;
 use App\Http\Controllers\Admin\AchatReturnController;
 use App\Http\Controllers\Admin\NetworkExportController;
 use App\Http\Controllers\Admin\WorkflowController;
+use App\Http\Controllers\Admin\AchatSessionController;
 
 // Controllers Distributor (à créer)
 use App\Http\Controllers\Distributor\DistributorDashboardController;
@@ -123,15 +124,18 @@ Route::middleware(['auth', 'verified', 'check_admin_role'])
             // Liste des périodes avec leur statut workflow
             Route::get('/', [WorkflowController::class, 'index'])->name('index');
 
+            // Historique du workflow
+            Route::get('/history/{period}', [WorkflowController::class, 'history'])->name('history');
+
             // Détail du workflow pour une période
             Route::get('/{period}', [WorkflowController::class, 'show'])->name('show');
 
-            // Actions du workflow
-            Route::post('/{period}/validate-purchases', [WorkflowController::class, 'validatePurchases'])->name('purchases-validated');
-            Route::post('/{period}/aggregate-purchases', [WorkflowController::class, 'aggregatePurchases'])->name('purchases-aggregated');
-            Route::post('/{period}/calculate-advancements', [WorkflowController::class, 'calculateAdvancements'])->name('advancements-calculated');
-            Route::post('/{period}/create-snapshot', [WorkflowController::class, 'createSnapshot'])->name('snapshot-created');
-            Route::post('/{period}/close', [WorkflowController::class, 'closePeriod'])->name('close-period');
+            // Actions du workflow - NOMS CORRIGÉS
+            Route::post('/validate-purchases', [WorkflowController::class, 'validatePurchases'])->name('validate-purchases');
+            Route::post('/aggregate-purchases', [WorkflowController::class, 'aggregatePurchases'])->name('aggregate-purchases');
+            Route::post('/calculate-advancements', [WorkflowController::class, 'calculateAdvancements'])->name('calculate-advancements');
+            Route::post('/create-snapshot', [WorkflowController::class, 'createSnapshot'])->name('create-snapshot');
+            Route::post('/close-period', [WorkflowController::class, 'closePeriod'])->name('close-period');
 
             // Rapport de période
             Route::get('/{period}/report', [WorkflowController::class, 'report'])->name('report');
@@ -188,6 +192,17 @@ Route::middleware(['auth', 'verified', 'check_admin_role'])
             Route::post('/{achat}/return', [AchatReturnController::class, 'create'])->name('return.create');
             Route::post('/returns/{return}/approve', [AchatReturnController::class, 'approve'])->name('return.approve');
             Route::post('/returns/{return}/reject', [AchatReturnController::class, 'reject'])->name('return.reject');
+
+            // NOUVELLES ROUTES - Sessions d'achats
+            Route::prefix('session')->name('session.')->group(function () {
+                Route::get('/start', [AchatSessionController::class, 'start'])->name('start');
+                Route::post('/init', [AchatSessionController::class, 'init'])->name('init');
+                Route::get('/summary', [AchatSessionController::class, 'summary'])->name('summary');
+                Route::post('/add-item', [AchatSessionController::class, 'addItem'])->name('add-item');
+                Route::delete('/remove-item', [AchatSessionController::class, 'removeItem'])->name('remove-item');
+                Route::post('/validate', [AchatSessionController::class, 'validate'])->name('validate');
+                Route::post('/cancel', [AchatSessionController::class, 'cancel'])->name('cancel');
+            });
         });
 
         // ===== GESTION DES PRODUITS =====
