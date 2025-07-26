@@ -2,7 +2,6 @@
 
 namespace App\Services;
 
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Auth;
@@ -11,39 +10,50 @@ use Carbon\Carbon;
 
 class BackupService
 {
-    private string $backupPath = 'backups/deletions';
-
     /**
      * Crée un backup avant suppression
      */
-    public function createDeletionBackup(string $entityType, int $entityId, array $relatedData = []): array
+    public function createBackup(string $entityType, int $entityId): array
     {
         try {
-            $backupId = $this->generateBackupId($entityType, $entityId);
+            // Générer un ID unique pour le backup
+            $backupId = Str::uuid()->toString();
             $timestamp = now();
+
+            // Récupérer les données de l'entité
+            $entityData = $this->getEntityData($entityType, $entityId);
+
+            // Récupérer les données liées si nécessaire
+            $relatedData = $this->getRelatedData($entityType, $entityId);
 
             // Préparer les données du backup
             $backupData = [
-                'backup_id' => $backupId,
                 'entity_type' => $entityType,
                 'entity_id' => $entityId,
-                'created_at' => $timestamp->toISOString(),
-                'created_by' => Auth::id() ?? 0,
-                'entity_data' => $this->getEntityData($entityType, $entityId),
+                'entity_data' => $entityData,
                 'related_data' => $relatedData,
                 'metadata' => [
-                    'app_version' => config('app.version', '1.0'),
-                    'db_connection' => config('database.default'),
-                    'user_ip' => request()->ip(),
-                    'user_agent' => request()->userAgent(),
+                    'created_by' => Auth::id() ?? 0,
+                    'created_at' => $timestamp,
+                    'app_version' => config('app.version', '1.0.0'),
+                    'backup_version' => '2.0'
                 ]
             ];
 
-            // Sauvegarder dans le système de fichiers
-            $filename = "{$this->backupPath}/{$entityType}/{$backupId}.json";
-            Storage::disk('local')->put($filename, json_encode($backupData, JSON_PRETTY_PRINT));
+            // Sauvegarder en JSON dans le dossier storage
+            $filename = "backups/{$entityType}/{$backupId}.json";
+            $fullPath = storage_path("app/{$filename}");
 
-            // Sauvegarder également dans la base de données pour un accès rapide
+            // Créer le répertoire si nécessaire
+            $directory = dirname($fullPath);
+            if (!file_exists($directory)) {
+                mkdir($directory, 0755, true);
+            }
+
+            // Écrire le fichier
+            file_put_contents($fullPath, json_encode($backupData, JSON_PRETTY_PRINT));
+
+            // Enregistrer dans la base de données
             DB::table('deletion_backups')->insert([
                 'backup_id' => $backupId,
                 'entity_type' => $entityType,
@@ -58,7 +68,8 @@ class BackupService
             Log::info("Backup créé avec succès", [
                 'backup_id' => $backupId,
                 'entity_type' => $entityType,
-                'entity_id' => $entityId
+                'entity_id' => $entityId,
+                'related_data_counts' => array_map('count', $relatedData)
             ]);
 
             return [
@@ -119,7 +130,7 @@ class BackupService
                 ->where('backup_id', $backupId)
                 ->update([
                     'restored_at' => now(),
-                    'restored_by' => Auth::id() ?? 0,
+                    'restored_by' => Auth::id() ?: null, // Utiliser null au lieu de 0 pour éviter les erreurs FK
                     'updated_at' => now()
                 ]);
 
@@ -154,120 +165,104 @@ class BackupService
     }
 
     /**
-     * Liste les backups disponibles
+     * Récupère les données liées à une entité
+     * VERSION CORRIGÉE : S'assure de récupérer TOUS les champs
      */
-    public function listBackups(array $filters = []): \Illuminate\Contracts\Pagination\LengthAwarePaginator
-{
-    $query = DB::table('deletion_backups');
-
-    // Appliquer les filtres
-    if (!empty($filters['entity_type'])) {
-        $query->where('entity_type', $filters['entity_type']);
-    }
-
-    if (!empty($filters['date_from'])) {
-        $query->whereDate('created_at', '>=', $filters['date_from']);
-    }
-
-    if (!empty($filters['date_to'])) {
-        $query->whereDate('created_at', '<=', $filters['date_to']);
-    }
-
-    if (!empty($filters['restored'])) {
-        if ($filters['restored'] === 'yes') {
-            $query->whereNotNull('restored_at');
-        } else {
-            $query->whereNull('restored_at');
-        }
-    }
-
-    // Ordonner par date de création décroissante
-    $query->orderBy('created_at', 'desc');
-
-    // Paginer les résultats
-    $backups = $query->paginate(20);
-
-    // Transformer les données JSON en tableaux PHP
-    $backups->transform(function ($backup) {
-        $backup->backup_data = json_decode($backup->backup_data, true);
-
-        // Ajouter la relation creator si nécessaire
-        if ($backup->created_by) {
-            $backup->creator = DB::table('users')
-                ->where('id', $backup->created_by)
-                ->first(['id', 'name', 'email']);
-        }
-
-        // Convertir les dates en objets Carbon
-        $backup->created_at = Carbon::parse($backup->created_at);
-        $backup->restored_at = $backup->restored_at ? Carbon::parse($backup->restored_at) : null;
-
-        return $backup;
-    });
-
-    return $backups;
-}
-
-    /**
-     * Nettoie les anciens backups
-     */
-    public function cleanupOldBackups(int $daysToKeep = 90): int
+    private function getRelatedData(string $entityType, int $entityId): array
     {
-        $cutoffDate = Carbon::now()->subDays($daysToKeep);
+        $relatedData = [];
 
-        // Récupérer les backups à supprimer
-        $backupsToDelete = DB::table('deletion_backups')
-            ->where('created_at', '<', $cutoffDate)
-            ->whereNull('restored_at') // Ne pas supprimer les backups restaurés
-            ->get();
+        switch ($entityType) {
+            case 'distributeur':
+                // Récupérer les achats AVEC TOUS LES CHAMPS
+                $relatedData['achats'] = DB::table('achats')
+                    ->where('distributeur_id', $entityId)
+                    ->select('*') // S'assurer de récupérer TOUS les champs
+                    ->get()
+                    ->map(function ($item) {
+                        return (array) $item;
+                    })
+                    ->toArray();
 
-        $deletedCount = 0;
+                // Récupérer les bonus
+                $relatedData['bonuses'] = DB::table('bonuses')
+                    ->where('distributeur_id', $entityId)
+                    ->select('*')
+                    ->get()
+                    ->map(function ($item) {
+                        return (array) $item;
+                    })
+                    ->toArray();
 
-        foreach ($backupsToDelete as $backup) {
-            try {
-                // Supprimer le fichier
-                if (Storage::disk('local')->exists($backup->file_path)) {
-                    Storage::disk('local')->delete($backup->file_path);
-                }
+                // Récupérer les niveaux
+                $relatedData['level_currents'] = DB::table('level_currents')
+                    ->where('distributeur_id', $entityId)
+                    ->select('*')
+                    ->get()
+                    ->map(function ($item) {
+                        return (array) $item;
+                    })
+                    ->toArray();
 
-                // Supprimer l'entrée DB
-                DB::table('deletion_backups')
-                    ->where('id', $backup->id)
-                    ->delete();
+                // Récupérer les enfants directs (juste les IDs)
+                $relatedData['children_ids'] = DB::table('distributeurs')
+                    ->where('id_distrib_parent', $entityId)
+                    ->pluck('id')
+                    ->toArray();
 
-                $deletedCount++;
-            } catch (\Exception $e) {
-                Log::warning("Impossible de supprimer le backup", [
-                    'backup_id' => $backup->backup_id,
-                    'error' => $e->getMessage()
+                // Log pour vérification
+                Log::info("Données liées récupérées pour distributeur {$entityId}", [
+                    'achats_count' => count($relatedData['achats']),
+                    'bonuses_count' => count($relatedData['bonuses']),
+                    'levels_count' => count($relatedData['level_currents']),
+                    'children_count' => count($relatedData['children_ids'])
                 ]);
-            }
+
+                // Vérifier que les achats ont bien tous les champs requis
+                foreach ($relatedData['achats'] as $index => $achat) {
+                    $requiredFields = ['id', 'distributeur_id', 'products_id', 'period'];
+                    $missingFields = array_diff($requiredFields, array_keys($achat));
+                    if (!empty($missingFields)) {
+                        Log::warning("Achat {$index} manque des champs requis", [
+                            'achat_id' => $achat['id'] ?? 'unknown',
+                            'missing_fields' => $missingFields
+                        ]);
+                    }
+                }
+                break;
+
+            case 'product':
+                // Récupérer les achats liés au produit AVEC TOUS LES CHAMPS
+                $relatedData['achats'] = DB::table('achats')
+                    ->where('products_id', $entityId)
+                    ->select('*')
+                    ->get()
+                    ->map(function ($item) {
+                        return (array) $item;
+                    })
+                    ->toArray();
+                break;
+
+            case 'achat':
+                // Pour un achat, on peut vouloir sauvegarder les informations du distributeur et produit
+                $achat = DB::table('achats')->find($entityId);
+                if ($achat) {
+                    $relatedData['distributeur'] = (array) DB::table('distributeurs')
+                        ->where('id', $achat->distributeur_id)
+                        ->first();
+
+                    $relatedData['product'] = (array) DB::table('products')
+                        ->where('id', $achat->products_id)
+                        ->first();
+                }
+                break;
         }
 
-        Log::info("Nettoyage des backups terminé", [
-            'deleted_count' => $deletedCount,
-            'cutoff_date' => $cutoffDate->toDateTimeString()
-        ]);
-
-        return $deletedCount;
+        return $relatedData;
     }
 
     /**
-     * Génère un ID unique pour le backup
-     */
-    private function generateBackupId(string $entityType, int $entityId): string
-    {
-        return sprintf(
-            '%s_%d_%s_%s',
-            $entityType,
-            $entityId,
-            now()->format('Ymd_His'),
-            Str::random(6)
-        );
-    }
-
-    /**
-     * Récupère les données de l'entité
+     * Récupère les données d'une entité
      */
     private function getEntityData(string $entityType, int $entityId): array
     {
@@ -314,12 +309,11 @@ class BackupService
         }
     }
 
-
     /**
-     * Mapper les anciennes colonnes vers les nouvelles
-     * AJOUTEZ CETTE MÉTHODE SI ELLE N'EXISTE PAS
+     * Mapper les anciennes colonnes vers les nouvelles ET ajouter les champs requis manquants
+     * PUBLIC pour permettre l'utilisation dans les commandes si nécessaire
      */
-    private function mapOldColumnsToNew(string $entityType, array $entityData): array
+    public function mapOldColumnsToNew(string $entityType, array $entityData): array
     {
         switch ($entityType) {
             case 'achat':
@@ -363,6 +357,16 @@ class BackupService
                     $entityData['online'] = 1;
                 }
 
+                // IMPORTANT : Ajouter purchase_date si manquant
+                if (!isset($entityData['purchase_date'])) {
+                    // Utiliser la date de création si disponible, sinon la date actuelle
+                    if (isset($entityData['created_at'])) {
+                        $entityData['purchase_date'] = date('Y-m-d', strtotime($entityData['created_at']));
+                    } else {
+                        $entityData['purchase_date'] = date('Y-m-d');
+                    }
+                }
+
                 // Supprimer les colonnes qui n'existent plus
                 unset($entityData['id_distrib_parent']);
 
@@ -382,76 +386,222 @@ class BackupService
 
     /**
      * Restaure une entité
-     * REMPLACEZ VOTRE MÉTHODE EXISTANTE PAR CELLE-CI
      */
     private function restoreEntity(string $entityType, array $entityData): void
-{
-    // LOG DE DEBUG 1
-    Log::info("=== DEBUT restoreEntity ===");
-    Log::info("Type: {$entityType}");
-    Log::info("Données AVANT mapping:", $entityData);
+    {
+        // LOG DE DEBUG
+        Log::info("=== DEBUT restoreEntity ===");
+        Log::info("Type: {$entityType}");
+        Log::info("Données AVANT mapping:", $entityData);
 
-    // Mapper les anciennes colonnes vers les nouvelles
-    $entityData = $this->mapOldColumnsToNew($entityType, $entityData);
+        // Mapper les anciennes colonnes vers les nouvelles ET ajouter les champs manquants
+        $entityData = $this->mapOldColumnsToNew($entityType, $entityData);
 
-    // LOG DE DEBUG 2
-    Log::info("Données APRÈS mapping:", $entityData);
+        // LOG DE DEBUG
+        Log::info("Données APRÈS mapping:", $entityData);
 
-    // Retirer les timestamps pour éviter les conflits
-    unset($entityData['created_at'], $entityData['updated_at']);
+        // Retirer les timestamps pour éviter les conflits
+        unset($entityData['created_at'], $entityData['updated_at']);
 
-    // Ajouter les nouveaux timestamps
-    $entityData['created_at'] = now();
-    $entityData['updated_at'] = now();
+        // Ajouter les nouveaux timestamps
+        $entityData['created_at'] = now();
+        $entityData['updated_at'] = now();
 
-    // LOG DE DEBUG 3
-    Log::info("Données FINALES avant insertion:", $entityData);
+        // LOG DE DEBUG
+        Log::info("Données FINALES avant insertion:", $entityData);
 
-    switch ($entityType) {
-        case 'distributeur':
-            DB::table('distributeurs')->insert($entityData);
-            break;
-        case 'achat':
-            DB::table('achats')->insert($entityData);
-            break;
-        case 'product':
-            DB::table('products')->insert($entityData);
-            break;
-        case 'bonus':
-            DB::table('bonuses')->insert($entityData);
-            break;
-        default:
-            throw new \Exception("Type d'entité non supporté pour la restauration : {$entityType}");
+        switch ($entityType) {
+            case 'distributeur':
+                DB::table('distributeurs')->insert($entityData);
+                break;
+            case 'achat':
+                DB::table('achats')->insert($entityData);
+                break;
+            case 'product':
+                DB::table('products')->insert($entityData);
+                break;
+            case 'bonus':
+                DB::table('bonuses')->insert($entityData);
+                break;
+            default:
+                throw new \Exception("Type d'entité non supporté pour la restauration : {$entityType}");
+        }
+
+        Log::info("=== FIN restoreEntity - Insertion réussie ===");
     }
-
-    Log::info("=== FIN restoreEntity - Insertion réussie ===");
-}
 
     /**
      * Restaure les données liées
-     * MODIFIEZ AUSSI CETTE MÉTHODE SI ELLE EXISTE
+     * VERSION CORRIGÉE : Gestion robuste des données manquantes
      */
     private function restoreRelatedData(string $entityType, int $entityId, array $relatedData): void
     {
-        // Cette méthode peut être étendue selon les besoins spécifiques
-        // Pour l'instant, on log simplement les données liées
-        Log::info("Données liées disponibles pour restauration", [
+        Log::info("Restauration des données liées", [
             'entity_type' => $entityType,
             'entity_id' => $entityId,
             'related_keys' => array_keys($relatedData)
         ]);
 
-        // Exemple : restaurer les achats d'un distributeur
+        // Restaurer les achats d'un distributeur
         if ($entityType === 'distributeur' && isset($relatedData['achats'])) {
+            $restored = 0;
+            $skipped = 0;
+
             foreach ($relatedData['achats'] as $achat) {
-                // IMPORTANT : Mapper aussi les données liées
-                $achat = $this->mapOldColumnsToNew('achat', $achat);
-                unset($achat['created_at'], $achat['updated_at']);
-                $achat['created_at'] = now();
-                $achat['updated_at'] = now();
-                DB::table('achats')->insert($achat);
+                try {
+                    // IMPORTANT : S'assurer que le distributeur_id est présent
+                    if (!isset($achat['distributeur_id'])) {
+                        $achat['distributeur_id'] = $entityId;
+                        Log::info("Ajout du distributeur_id manquant dans l'achat", [
+                            'achat_id' => $achat['id'] ?? 'unknown',
+                            'distributeur_id' => $entityId
+                        ]);
+                    }
+
+                    // Vérifier les champs obligatoires avant insertion
+                    if (!isset($achat['products_id'])) {
+                        Log::warning("Achat ignoré car products_id manquant", [
+                            'achat_id' => $achat['id'] ?? 'unknown',
+                            'distributeur_id' => $entityId,
+                            'achat_data' => $achat
+                        ]);
+                        $skipped++;
+                        continue; // Passer à l'achat suivant
+                    }
+
+                    // Mapper les données de l'achat
+                    $achat = $this->mapOldColumnsToNew('achat', $achat);
+
+                    // Supprimer les timestamps pour éviter les conflits
+                    unset($achat['created_at'], $achat['updated_at']);
+                    $achat['created_at'] = now();
+                    $achat['updated_at'] = now();
+
+                    DB::table('achats')->insert($achat);
+                    $restored++;
+                    Log::info("Achat restauré avec succès", ['achat_id' => $achat['id'] ?? 'new']);
+
+                } catch (\Exception $e) {
+                    Log::error("Erreur lors de la restauration d'un achat lié", [
+                        'error' => $e->getMessage(),
+                        'achat_data' => $achat
+                    ]);
+                    $skipped++;
+                }
+            }
+
+            if ($skipped > 0) {
+                Log::warning("Certains achats n'ont pas pu être restaurés", [
+                    'restored' => $restored,
+                    'skipped' => $skipped,
+                    'total' => count($relatedData['achats'])
+                ]);
             }
         }
+
+        // Restaurer les bonus d'un distributeur
+        if ($entityType === 'distributeur' && isset($relatedData['bonuses'])) {
+            foreach ($relatedData['bonuses'] as $bonus) {
+                try {
+                    // S'assurer que le distributeur_id est présent
+                    if (!isset($bonus['distributeur_id'])) {
+                        $bonus['distributeur_id'] = $entityId;
+                    }
+
+                    $bonus = $this->mapOldColumnsToNew('bonus', $bonus);
+                    unset($bonus['created_at'], $bonus['updated_at']);
+                    $bonus['created_at'] = now();
+                    $bonus['updated_at'] = now();
+
+                    DB::table('bonuses')->insert($bonus);
+
+                } catch (\Exception $e) {
+                    Log::error("Erreur lors de la restauration d'un bonus lié", [
+                        'error' => $e->getMessage(),
+                        'bonus_data' => $bonus
+                    ]);
+                }
+            }
+        }
+
+        // Restaurer les level_currents d'un distributeur
+        if ($entityType === 'distributeur' && isset($relatedData['level_currents'])) {
+            foreach ($relatedData['level_currents'] as $level) {
+                try {
+                    // S'assurer que le distributeur_id est présent
+                    if (!isset($level['distributeur_id'])) {
+                        $level['distributeur_id'] = $entityId;
+                    }
+
+                    unset($level['created_at'], $level['updated_at']);
+                    $level['created_at'] = now();
+                    $level['updated_at'] = now();
+
+                    DB::table('level_currents')->insert($level);
+
+                } catch (\Exception $e) {
+                    Log::error("Erreur lors de la restauration d'un level_current lié", [
+                        'error' => $e->getMessage(),
+                        'level_data' => $level
+                    ]);
+                }
+            }
+        }
+    }
+
+    /**
+     * Liste les backups disponibles
+     */
+    public function listBackups(array $filters = []): \Illuminate\Contracts\Pagination\LengthAwarePaginator
+    {
+        $query = DB::table('deletion_backups');
+
+        // Appliquer les filtres
+        if (!empty($filters['entity_type'])) {
+            $query->where('entity_type', $filters['entity_type']);
+        }
+
+        if (!empty($filters['date_from'])) {
+            $query->whereDate('created_at', '>=', $filters['date_from']);
+        }
+
+        if (!empty($filters['date_to'])) {
+            $query->whereDate('created_at', '<=', $filters['date_to']);
+        }
+
+        if (!empty($filters['restored'])) {
+            if ($filters['restored'] === 'yes') {
+                $query->whereNotNull('restored_at');
+            } else {
+                $query->whereNull('restored_at');
+            }
+        }
+
+        // Ordonner par date de création décroissante
+        $query->orderBy('created_at', 'desc');
+
+        // Paginer les résultats
+        $backups = $query->paginate(20);
+
+        // Transformer les données JSON en tableaux PHP
+        $backups->transform(function ($backup) {
+            $backup->backup_data = json_decode($backup->backup_data, true);
+
+            // Ajouter la relation creator si nécessaire
+            if ($backup->created_by) {
+                $backup->creator = DB::table('users')
+                    ->where('id', $backup->created_by)
+                    ->first(['id', 'name', 'email']);
+            }
+
+            // Convertir les dates en objets Carbon
+            $backup->created_at = Carbon::parse($backup->created_at);
+            $backup->restored_at = $backup->restored_at ? Carbon::parse($backup->restored_at) : null;
+
+            return $backup;
+        });
+
+        return $backups;
     }
 
     /**
