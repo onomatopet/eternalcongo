@@ -120,13 +120,21 @@ Route::middleware(['auth', 'verified', 'check_admin_role'])
 
         // ===== WORKFLOW DE GESTION DES PÉRIODES =====
         Route::prefix('workflow')->name('workflow.')->group(function () {
-            Route::get('/{period?}', [WorkflowController::class, 'index'])->name('index');
-            Route::post('/validate-purchases', [WorkflowController::class, 'validatePurchases'])->name('validate-purchases');
-            Route::post('/aggregate-purchases', [WorkflowController::class, 'aggregatePurchases'])->name('aggregate-purchases');
-            Route::post('/calculate-advancements', [WorkflowController::class, 'calculateAdvancements'])->name('calculate-advancements');
-            Route::post('/create-snapshot', [WorkflowController::class, 'createSnapshot'])->name('create-snapshot');
-            Route::post('/close-period', [WorkflowController::class, 'closePeriod'])->name('close-period');
-            Route::get('/history/{period}', [WorkflowController::class, 'history'])->name('history');
+            // Liste des périodes avec leur statut workflow
+            Route::get('/', [WorkflowController::class, 'index'])->name('index');
+
+            // Détail du workflow pour une période
+            Route::get('/{period}', [WorkflowController::class, 'show'])->name('show');
+
+            // Actions du workflow
+            Route::post('/{period}/validate-purchases', [WorkflowController::class, 'validatePurchases'])->name('purchases-validated');
+            Route::post('/{period}/aggregate-purchases', [WorkflowController::class, 'aggregatePurchases'])->name('purchases-aggregated');
+            Route::post('/{period}/calculate-advancements', [WorkflowController::class, 'calculateAdvancements'])->name('advancements-calculated');
+            Route::post('/{period}/create-snapshot', [WorkflowController::class, 'createSnapshot'])->name('snapshot-created');
+            Route::post('/{period}/close', [WorkflowController::class, 'closePeriod'])->name('close-period');
+
+            // Rapport de période
+            Route::get('/{period}/report', [WorkflowController::class, 'report'])->name('report');
         });
 
         // ===== GESTION DES DISTRIBUTEURS =====

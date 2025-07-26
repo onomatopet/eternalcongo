@@ -205,4 +205,61 @@ class SystemPeriod extends Model
             $this->update($updates);
         }
     }
+
+    /**
+     * Helper pour obtenir l'utilisateur qui a complété une étape
+     */
+    public function completedByUser($field)
+    {
+        $relation = str_replace('_', '', ucwords($field, '_'));
+        $method = lcfirst($relation);
+
+        if (method_exists($this, $method)) {
+            return $this->$method;
+        }
+
+        return null;
+    }
+
+    /**
+     * Vérifie si la période peut être modifiée
+     */
+    public function canBeModified(): bool
+    {
+        return $this->status !== 'closed';
+    }
+
+    /**
+     * Vérifie si la période est dans le workflow
+     */
+    public function isInWorkflow(): bool
+    {
+        return $this->status === 'active';
+    }
+
+    /**
+     * Obtient le nombre d'étapes complétées
+     */
+    public function getCompletedStepsCount(): int
+    {
+        $count = 0;
+
+        if ($this->status !== 'draft') $count++;
+        if ($this->status === 'active') $count++;
+        if ($this->purchases_validated) $count++;
+        if ($this->purchases_aggregated) $count++;
+        if ($this->advancements_calculated) $count++;
+        if ($this->snapshot_created) $count++;
+        if ($this->status === 'closed') $count++;
+
+        return $count;
+    }
+
+    /**
+     * Obtient le pourcentage de progression
+     */
+    public function getProgressPercentage(): float
+    {
+        return ($this->getCompletedStepsCount() / 7) * 100;
+    }
 }
