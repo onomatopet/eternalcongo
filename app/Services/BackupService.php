@@ -314,10 +314,10 @@ class BackupService
         }
     }
 
-    // Dans app/Services/BackupService.php, remplacez la méthode restoreEntity existante par :
 
     /**
      * Mapper les anciennes colonnes vers les nouvelles
+     * AJOUTEZ CETTE MÉTHODE SI ELLE N'EXISTE PAS
      */
     private function mapOldColumnsToNew(string $entityType, array $entityData): array
     {
@@ -329,18 +329,30 @@ class BackupService
                     unset($entityData['montant']);
                 }
 
-                if (isset($entityData['points']) && !isset($entityData['pointvaleur'])) {
-                    $entityData['pointvaleur'] = $entityData['points'];
+                // La colonne 'points' doit être mappée vers 'points_unitaire_achat'
+                if (isset($entityData['points'])) {
+                    if (!isset($entityData['points_unitaire_achat'])) {
+                        $entityData['points_unitaire_achat'] = $entityData['points'];
+                    }
                     unset($entityData['points']);
                 }
 
-                if (isset($entityData['pointvaleur']) && !isset($entityData['points_unitaire_achat'])) {
-                    $entityData['points_unitaire_achat'] = $entityData['pointvaleur'];
+                // Si 'pointvaleur' existe dans les anciennes données, la mapper vers points_unitaire_achat
+                if (isset($entityData['pointvaleur'])) {
+                    if (!isset($entityData['points_unitaire_achat'])) {
+                        $entityData['points_unitaire_achat'] = $entityData['pointvaleur'];
+                    }
+                    // IMPORTANT : Supprimer pointvaleur car cette colonne n'existe plus
+                    unset($entityData['pointvaleur']);
                 }
 
-                // S'assurer que les colonnes requises existent
+                // S'assurer que les colonnes requises existent avec des valeurs par défaut
                 if (!isset($entityData['prix_unitaire_achat'])) {
                     $entityData['prix_unitaire_achat'] = 0;
+                }
+
+                if (!isset($entityData['points_unitaire_achat'])) {
+                    $entityData['points_unitaire_achat'] = 0;
                 }
 
                 if (!isset($entityData['qt'])) {
@@ -370,39 +382,54 @@ class BackupService
 
     /**
      * Restaure une entité
+     * REMPLACEZ VOTRE MÉTHODE EXISTANTE PAR CELLE-CI
      */
     private function restoreEntity(string $entityType, array $entityData): void
-    {
-        // AJOUT: Mapper les anciennes colonnes vers les nouvelles
-        $entityData = $this->mapOldColumnsToNew($entityType, $entityData);
+{
+    // LOG DE DEBUG 1
+    Log::info("=== DEBUT restoreEntity ===");
+    Log::info("Type: {$entityType}");
+    Log::info("Données AVANT mapping:", $entityData);
 
-        // Retirer les timestamps pour éviter les conflits
-        unset($entityData['created_at'], $entityData['updated_at']);
+    // Mapper les anciennes colonnes vers les nouvelles
+    $entityData = $this->mapOldColumnsToNew($entityType, $entityData);
 
-        // Ajouter les nouveaux timestamps
-        $entityData['created_at'] = now();
-        $entityData['updated_at'] = now();
+    // LOG DE DEBUG 2
+    Log::info("Données APRÈS mapping:", $entityData);
 
-        switch ($entityType) {
-            case 'distributeur':
-                DB::table('distributeurs')->insert($entityData);
-                break;
-            case 'achat':
-                DB::table('achats')->insert($entityData);
-                break;
-            case 'product':
-                DB::table('products')->insert($entityData);
-                break;
-            case 'bonus':
-                DB::table('bonuses')->insert($entityData);
-                break;
-            default:
-                throw new \Exception("Type d'entité non supporté pour la restauration : {$entityType}");
-        }
+    // Retirer les timestamps pour éviter les conflits
+    unset($entityData['created_at'], $entityData['updated_at']);
+
+    // Ajouter les nouveaux timestamps
+    $entityData['created_at'] = now();
+    $entityData['updated_at'] = now();
+
+    // LOG DE DEBUG 3
+    Log::info("Données FINALES avant insertion:", $entityData);
+
+    switch ($entityType) {
+        case 'distributeur':
+            DB::table('distributeurs')->insert($entityData);
+            break;
+        case 'achat':
+            DB::table('achats')->insert($entityData);
+            break;
+        case 'product':
+            DB::table('products')->insert($entityData);
+            break;
+        case 'bonus':
+            DB::table('bonuses')->insert($entityData);
+            break;
+        default:
+            throw new \Exception("Type d'entité non supporté pour la restauration : {$entityType}");
     }
+
+    Log::info("=== FIN restoreEntity - Insertion réussie ===");
+}
 
     /**
      * Restaure les données liées
+     * MODIFIEZ AUSSI CETTE MÉTHODE SI ELLE EXISTE
      */
     private function restoreRelatedData(string $entityType, int $entityId, array $relatedData): void
     {
@@ -417,6 +444,8 @@ class BackupService
         // Exemple : restaurer les achats d'un distributeur
         if ($entityType === 'distributeur' && isset($relatedData['achats'])) {
             foreach ($relatedData['achats'] as $achat) {
+                // IMPORTANT : Mapper aussi les données liées
+                $achat = $this->mapOldColumnsToNew('achat', $achat);
                 unset($achat['created_at'], $achat['updated_at']);
                 $achat['created_at'] = now();
                 $achat['updated_at'] = now();
