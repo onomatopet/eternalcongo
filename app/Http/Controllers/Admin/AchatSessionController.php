@@ -47,7 +47,7 @@ class AchatSessionController extends Controller
         session([
             'achats_session' => [
                 'distributeur_id' => $distributeur->id,
-                'distributeur_info' => $distributeur->distributeur_id . ' - ' . $distributeur->nom . ' ' . $distributeur->prenom,
+                'distributeur_info' => $distributeur->distributeur_id . ' - ' . $distributeur->nom_distributeur . ' ' . $distributeur->pnom_distributeur,
                 'date' => $validated['date'],
                 'period' => SystemPeriod::getCurrentPeriod()->period,
                 'items' => [],
@@ -61,7 +61,7 @@ class AchatSessionController extends Controller
         ]);
 
         return redirect()->route('admin.achats.session.summary')
-            ->with('success', 'Session d\'achats démarrée pour ' . $distributeur->nom . ' ' . $distributeur->prenom);
+            ->with('success', 'Session d\'achats démarrée pour ' . $distributeur->nom_distributeur . ' ' . $distributeur->pnom_distributeur);
     }
 
     /**
@@ -75,7 +75,7 @@ class AchatSessionController extends Controller
         }
 
         $session = session('achats_session');
-        $products = Product::with('pointValeur')->orderBy('nom')->get();
+        $products = Product::with('pointValeur')->orderBy('nom_produit')->get(); // CORRECTION ICI : nom_produit au lieu de nom
 
         return view('admin.achats.session.summary', compact('session', 'products'));
     }
@@ -118,7 +118,7 @@ class AchatSessionController extends Controller
             // Ajouter un nouveau produit
             $session['items'][] = [
                 'product_id' => $product->id,
-                'product_name' => $product->nom,
+                'product_name' => $product->nom_produit, // CORRECTION ICI : nom_produit au lieu de nom
                 'quantity' => $validated['quantity'],
                 'prix_unitaire' => $product->prix_product,
                 'points_unitaire' => $product->pointValeur->numbers,
