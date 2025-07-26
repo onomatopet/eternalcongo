@@ -38,6 +38,19 @@
             </div>
         </div>
 
+        {{-- Messages de session --}}
+        @if(session('success'))
+            <div class="mb-4 bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded relative" role="alert">
+                <span class="block sm:inline">{{ session('success') }}</span>
+            </div>
+        @endif
+
+        @if(session('error'))
+            <div class="mb-4 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative" role="alert">
+                <span class="block sm:inline">{{ session('error') }}</span>
+            </div>
+        @endif
+
         {{-- Statistiques --}}
         <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
             <div class="bg-white rounded-lg shadow-sm p-6">
@@ -293,7 +306,7 @@
                                         </button>
 
                                         @if(!$backup->restored_at && auth()->user()->hasPermission('restore_backups'))
-                                            <form action="{{ route('admin.backups.restore') }}" method="POST" class="inline">
+                                            <form action="{{ route('admin.deletion-requests.restore-backup') }}" method="POST" class="inline">
                                                 @csrf
                                                 <input type="hidden" name="backup_id" value="{{ $backup->backup_id }}">
                                                 <button type="submit"

@@ -143,6 +143,15 @@ Route::middleware(['auth', 'verified', 'check_admin_role'])
             Route::get('/', [NetworkExportController::class, 'index'])->name('index');
             Route::post('/export', [NetworkExportController::class, 'export'])->name('export');
             Route::get('/download/{filename}', [NetworkExportController::class, 'download'])->name('download');
+
+            // Routes de recherche AJAX
+            Route::get('/search/distributeurs', [NetworkExportController::class, 'searchDistributeurs'])->name('search.distributeurs');
+            Route::get('/search/periods', [NetworkExportController::class, 'searchPeriods'])->name('search.periods');
+
+            // Routes d'export
+            Route::post('/export/html', [NetworkExportController::class, 'exportHtml'])->name('export.html');
+            Route::post('/export/pdf', [NetworkExportController::class, 'exportPdf'])->name('export.pdf');
+            Route::post('/export/excel', [NetworkExportController::class, 'exportExcel'])->name('export.excel');
         });
 
         // ===== GESTION DES ACHATS =====

@@ -10,6 +10,7 @@ use Illuminate\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Auth;
 use App\Http\Controllers\Admin\DistributeurController;
+use Illuminate\Support\Facades\DB;
 
 class DeletionRequestController extends Controller
 {
@@ -243,24 +244,52 @@ class DeletionRequestController extends Controller
      */
     public function restoreBackup(Request $request): RedirectResponse
     {
+        \Log::info('=== DEBUT RESTAURATION BACKUP ===');
+        \Log::info('Request data:', $request->all());
+        \Log::info('User:', ['id' => Auth::id(), 'name' => Auth::user()->name]);
+
         $request->validate([
             'backup_id' => 'required|string'
         ]);
 
+        \Log::info('Validation passée');
+
         if (!Auth::user()->hasPermission('restore_backups')) {
+            \Log::error('Permission refusée');
             return back()->with('error', 'Vous n\'avez pas les permissions pour restaurer des backups.');
         }
 
+        \Log::info('Permission accordée');
+
         try {
-            $result = $this->backupService->restoreFromBackup($request->input('backup_id'));
+            $backupId = $request->input('backup_id');
+            \Log::info('Tentative de restauration du backup:', ['backup_id' => $backupId]);
+
+            // Vérifier que le backup existe
+            $backupExists = DB::table('deletion_backups')->where('backup_id', $backupId)->exists();
+            \Log::info('Backup existe?', ['exists' => $backupExists]);
+
+            if (!$backupExists) {
+                throw new \Exception("Backup {$backupId} n'existe pas dans la base de données");
+            }
+
+            $result = $this->backupService->restoreFromBackup($backupId);
+
+            \Log::info('Résultat restauration:', $result);
 
             if ($result['success']) {
+                \Log::info('Restauration réussie');
                 return back()->with('success', 'Backup restauré avec succès.');
             } else {
+                \Log::error('Restauration échouée:', ['error' => $result['error']]);
                 return back()->with('error', 'Erreur lors de la restauration: ' . $result['error']);
             }
 
         } catch (\Exception $e) {
+            \Log::error('Exception lors de la restauration:', [
+                'message' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
             return back()->with('error', 'Erreur lors de la restauration: ' . $e->getMessage());
         }
     }

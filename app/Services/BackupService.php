@@ -314,11 +314,68 @@ class BackupService
         }
     }
 
+    // Dans app/Services/BackupService.php, remplacez la méthode restoreEntity existante par :
+
+    /**
+     * Mapper les anciennes colonnes vers les nouvelles
+     */
+    private function mapOldColumnsToNew(string $entityType, array $entityData): array
+    {
+        switch ($entityType) {
+            case 'achat':
+                // Mapper les anciennes colonnes vers les nouvelles
+                if (isset($entityData['montant']) && !isset($entityData['montant_total_ligne'])) {
+                    $entityData['montant_total_ligne'] = $entityData['montant'];
+                    unset($entityData['montant']);
+                }
+
+                if (isset($entityData['points']) && !isset($entityData['pointvaleur'])) {
+                    $entityData['pointvaleur'] = $entityData['points'];
+                    unset($entityData['points']);
+                }
+
+                if (isset($entityData['pointvaleur']) && !isset($entityData['points_unitaire_achat'])) {
+                    $entityData['points_unitaire_achat'] = $entityData['pointvaleur'];
+                }
+
+                // S'assurer que les colonnes requises existent
+                if (!isset($entityData['prix_unitaire_achat'])) {
+                    $entityData['prix_unitaire_achat'] = 0;
+                }
+
+                if (!isset($entityData['qt'])) {
+                    $entityData['qt'] = 1;
+                }
+
+                if (!isset($entityData['online'])) {
+                    $entityData['online'] = 1;
+                }
+
+                // Supprimer les colonnes qui n'existent plus
+                unset($entityData['id_distrib_parent']);
+
+                break;
+
+            case 'bonus':
+                // Mapper bonus vers montant si nécessaire
+                if (isset($entityData['bonus']) && !isset($entityData['montant'])) {
+                    $entityData['montant'] = $entityData['bonus'];
+                    unset($entityData['bonus']);
+                }
+                break;
+        }
+
+        return $entityData;
+    }
+
     /**
      * Restaure une entité
      */
     private function restoreEntity(string $entityType, array $entityData): void
     {
+        // AJOUT: Mapper les anciennes colonnes vers les nouvelles
+        $entityData = $this->mapOldColumnsToNew($entityType, $entityData);
+
         // Retirer les timestamps pour éviter les conflits
         unset($entityData['created_at'], $entityData['updated_at']);
 

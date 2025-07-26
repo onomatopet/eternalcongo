@@ -5,8 +5,8 @@
         <title>{{ $mainDistributor->distributeur_id }}_{{ strtoupper($mainDistributor->nom_distributeur) }}_NETWORK_STRUCTURE </title>
         <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
         <!-- Styles -->
-        <link type="text/css" rel="stylesheet" href="{{ asset('assets/plugins/materialize/css/materialize.min.css') }}"/>
-        <link href="{{ asset('assets/plugins/tabfinaltables/css/jquery.tabfinalTables.min.css') }}" rel="stylesheet">
+        <link type="text/css" rel="stylesheet" href="{{ asset('assets/css/materialize.min.css') }}"/>
+        <link href="{{ asset('assets/css/jquery.tabfinalTables.min.css') }}" rel="stylesheet">
 
     <style>
 
@@ -67,10 +67,6 @@
     </head>
     <body class="white">
 <body>
-
-<div class="col s12 m-t-sm boutonPrint">
-    <button><a href="#" onclick="print();" class="waves-effect waves-light btn"><i class="material-icons right">print</i>IMPRIMER LE BON</a></button>
-</div>
 
 <table align="center">
     <tr>

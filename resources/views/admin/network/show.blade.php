@@ -63,7 +63,7 @@
                             Imprimer
                         </button>
 
-                        {{-- Bouton Export PDF --}}
+                        {{-- Bouton Export PDF
                         <form action="{{ route('admin.network.export.pdf') }}" method="POST" class="inline">
                             @csrf
                             <input type="hidden" name="distributeur_id" value="{{ request('distributeur_id') }}">
@@ -83,7 +83,7 @@
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3M9 21h6a2 2 0 002-2V9l-5-5H7a2 2 0 00-2 2v13a2 2 0 002 2z"/>
                             </svg>
                             Export Excel
-                        </button>
+                        </button>--}}
                     </div>
                 </div>
 

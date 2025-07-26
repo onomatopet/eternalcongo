@@ -25,30 +25,36 @@
         </div>
 
         {{-- Formulaire moderne --}}
-        <form action="{{ route('admin.network.export') }}" method="GET" id="networkExportForm">
+        <form action="{{ route('admin.network.export') }}" method="POST" id="networkExportForm">
+            @csrf
             <div class="space-y-6">
                 {{-- Étape 1: Sélection du distributeur --}}
                 <div class="bg-white shadow-lg rounded-lg">
                     <div class="bg-gradient-to-r from-blue-500 to-blue-600 px-6 py-4 rounded-t-lg">
                         <div class="flex items-center">
-                            <span class="flex-shrink-0 w-8 h-8 bg-white bg-opacity-20 rounded-full flex items-center justify-center text-white font-semibold mr-3">1</span>
-                            <h2 class="text-lg font-semibold text-white">Sélectionner un distributeur</h2>
+                            <div class="flex-shrink-0 bg-white/20 p-3 rounded-lg">
+                                <svg class="h-6 w-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
+                                </svg>
+                            </div>
+                            <div class="ml-4">
+                                <h2 class="text-xl font-semibold text-white">Étape 1 : Sélectionner un distributeur</h2>
+                                <p class="text-blue-100 text-sm">Recherchez et sélectionnez le distributeur principal</p>
+                            </div>
                         </div>
                     </div>
 
                     <div class="p-6">
-                        <label class="block text-sm font-medium text-gray-700 mb-3">
-                            Recherchez par matricule, nom ou prénom
-                        </label>
-
-                        {{-- Conteneur de recherche avec position relative --}}
+                        {{-- Champ de recherche moderne --}}
                         <div class="relative">
-                            {{-- Barre de recherche --}}
+                            <label for="distributeur_search" class="block text-sm font-medium text-gray-700 mb-2">
+                                Rechercher un distributeur :
+                            </label>
                             <div class="relative">
                                 <input type="text"
                                        id="distributeur_search"
-                                       placeholder="Ex: 1234567, Dupont, Jean..."
-                                       class="w-full pl-12 pr-4 py-3 border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                                       placeholder="Tapez un matricule, nom ou prénom..."
+                                       class="w-full px-4 py-3 pl-12 pr-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200"
                                        autocomplete="off">
                                 <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                                     <svg class="h-6 w-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -56,54 +62,37 @@
                                     </svg>
                                 </div>
                                 {{-- Spinner de chargement --}}
-                                <div id="search_spinner" class="hidden absolute inset-y-0 right-0 pr-3 flex items-center">
-                                    <svg class="animate-spin h-5 w-5 text-blue-600" fill="none" viewBox="0 0 24 24">
+                                <div id="search_spinner" class="absolute inset-y-0 right-0 pr-3 flex items-center hidden">
+                                    <svg class="animate-spin h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24">
                                         <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                                         <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                                     </svg>
                                 </div>
                             </div>
 
-                            {{-- Résultats de recherche - Positionnement absolu dans le conteneur relatif --}}
-                            <div id="search_results"
-                                 class="hidden absolute mt-1 w-full bg-white rounded-lg shadow-xl border border-gray-200 max-h-80 overflow-y-auto z-50">
+                            {{-- Résultats de recherche --}}
+                            <div id="search_results" class="absolute z-10 w-full mt-2 bg-white rounded-lg shadow-lg border border-gray-200 hidden max-h-60 overflow-y-auto">
+                                <!-- Les résultats seront insérés ici par JavaScript -->
                             </div>
-
-                            {{-- Champ caché pour l'ID --}}
-                            <input type="hidden" name="distributeur_id" id="distributeur_id" required>
                         </div>
 
-                        {{-- Message d'aide --}}
-                        <p class="mt-2 text-sm text-gray-500">
-                            Commencez à taper pour rechercher parmi les {{ number_format($totalDistributeurs ?? 5000) }} distributeurs
-                        </p>
-
-                        {{-- Distributeur sélectionné avec style carte --}}
-                        <div id="selected_distributeur" class="hidden mt-4">
-                            <div class="bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-200 rounded-lg p-4">
-                                <div class="flex items-center justify-between">
-                                    <div class="flex items-center">
-                                        <div class="flex-shrink-0">
-                                            <div class="w-12 h-12 bg-blue-600 rounded-full flex items-center justify-center">
-                                                <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
-                                                </svg>
-                                            </div>
-                                        </div>
-                                        <div class="ml-4">
-                                            <div class="text-sm text-gray-600">Distributeur sélectionné</div>
-                                            <div id="selected_text" class="text-lg font-semibold text-gray-900"></div>
-                                        </div>
-                                    </div>
-                                    <button type="button" onclick="clearSelection()"
-                                            class="text-gray-400 hover:text-gray-600 transition-colors duration-200">
-                                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-                                        </svg>
-                                    </button>
+                        {{-- Distributeur sélectionné --}}
+                        <div id="selected_distributeur" class="mt-4 p-4 bg-blue-50 rounded-lg hidden">
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <p class="text-sm text-blue-600 font-medium">Distributeur sélectionné :</p>
+                                    <p id="selected_text" class="text-lg font-semibold text-blue-900"></p>
                                 </div>
+                                <button type="button" onclick="resetDistributeur()" class="text-blue-600 hover:text-blue-800">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                                    </svg>
+                                </button>
                             </div>
                         </div>
+
+                        {{-- Input caché pour l'ID du distributeur --}}
+                        <input type="hidden" name="distributeur_id" id="distributeur_id" value="{{ old('distributeur_id') }}">
 
                         @error('distributeur_id')
                             <p class="mt-2 text-sm text-red-600">{{ $message }}</p>
@@ -142,34 +131,36 @@
                                        @input="searchPeriods"
                                        @focus="showSuggestions = true"
                                        @keydown.escape="showSuggestions = false"
-                                       class="w-full px-4 py-3 pr-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                                       placeholder="Ex: 2025-06"
+                                       @keydown.arrow-down.prevent="navigateDown"
+                                       @keydown.arrow-up.prevent="navigateUp"
+                                       @keydown.enter.prevent="selectHighlighted"
+                                       placeholder="Ex: 2024-07"
                                        pattern="\d{4}-\d{2}"
-                                       maxlength="7"
-                                       autocomplete="off">
+                                       value="{{ old('period') }}"
+                                       class="w-full px-4 py-3 pl-12 pr-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors duration-200"
+                                       autocomplete="off"
+                                       required>
 
-                                {{-- Icône calendrier --}}
-                                <div class="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-                                    <svg class="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                    <svg class="h-6 w-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                                    </svg>
+                                </div>
+
+                                {{-- Spinner de chargement --}}
+                                <div x-show="loading" class="absolute inset-y-0 right-0 pr-3 flex items-center">
+                                    <svg class="animate-spin h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24">
+                                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                                     </svg>
                                 </div>
                             </div>
 
-                            {{-- Liste des suggestions --}}
+                            {{-- Suggestions de périodes --}}
                             <div x-show="showSuggestions && suggestions.length > 0"
                                  x-transition
-                                 @click.away="showSuggestions = false"
-                                 class="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-48 overflow-auto">
-
-                                <div x-show="loading" class="p-3 text-center text-gray-500">
-                                    <svg class="animate-spin h-5 w-5 mx-auto" fill="none" viewBox="0 0 24 24">
-                                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-                                    </svg>
-                                </div>
-
-                                <template x-for="period in suggestions" :key="period.value">
+                                 class="absolute z-10 w-full mt-2 bg-white rounded-lg shadow-lg border border-gray-200 max-h-60 overflow-y-auto">
+                                <template x-for="(period, index) in suggestions" :key="period.value">
                                     <button type="button"
                                             @click="selectPeriod(period)"
                                             class="w-full px-4 py-2 text-left hover:bg-blue-50 focus:bg-blue-50 focus:outline-none transition-colors duration-150">
@@ -233,6 +224,9 @@
     </div>
 </div>
 
+{{-- Scripts identiques, mais j'ajoute les sections Blade --}}
+@endsection
+
 @push('styles')
 <style>
     /* Style pour les options de période sélectionnées */
@@ -262,6 +256,7 @@
 
 @push('scripts')
 <script>
+    // Le script reste identique, seule la méthode du formulaire a changé
     let searchTimeout;
     let selectedDistributeur = null;
 
@@ -274,6 +269,19 @@
     const distributeurIdInput = document.getElementById('distributeur_id');
     const submitButton = document.getElementById('submit_button');
     const buttonText = document.getElementById('button_text');
+
+    // Fonction pour vérifier la validité du formulaire
+    function checkFormValidity() {
+        const hasDistributeur = distributeurIdInput.value && distributeurIdInput.value !== '';
+        const periodInput = document.getElementById('period-input');
+        const hasPeriod = periodInput && periodInput.value && periodInput.value.match(/^\d{4}-\d{2}$/);
+
+        if (hasDistributeur && hasPeriod) {
+            submitButton.disabled = false;
+        } else {
+            submitButton.disabled = true;
+        }
+    }
 
     // Recherche de distributeurs avec debounce
     searchInput.addEventListener('input', function() {
@@ -302,59 +310,36 @@
                                 <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
                                 </svg>
-                                <p class="mt-2 text-sm text-gray-500">Aucun distributeur trouvé pour "${query}"</p>
+                                <p class="mt-2 text-sm text-gray-500">Aucun distributeur trouvé</p>
                             </div>
                         `;
                     } else {
                         searchResults.innerHTML = data.map(dist => `
-                            <div class="px-4 py-3 hover:bg-gray-50 cursor-pointer transition-colors duration-150 border-b border-gray-100 last:border-b-0"
-                                 onclick="selectDistributeur('${dist.distributeur_id}', '${dist.display_name}')">
-                                <div class="flex items-center">
-                                    <div class="flex-shrink-0">
-                                        <div class="h-10 w-10 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center">
-                                            <span class="text-sm font-bold text-white">
-                                                ${dist.nom_distributeur.charAt(0)}${dist.pnom_distributeur.charAt(0)}
-                                            </span>
-                                        </div>
+                            <div class="px-4 py-3 hover:bg-blue-50 cursor-pointer transition-colors duration-150 flex items-center justify-between"
+                                 onclick="selectDistributeur('${dist.distributeur_id}', '${dist.nom_distributeur} ${dist.pnom_distributeur}')">
+                                <div>
+                                    <div class="font-medium text-gray-900">
+                                        ${dist.nom_distributeur} ${dist.pnom_distributeur}
                                     </div>
-                                    <div class="ml-3 flex-1">
-                                        <div class="flex items-center justify-between">
-                                            <div>
-                                                <div class="text-sm font-medium text-gray-900">
-                                                    ${dist.distributeur_id}
-                                                </div>
-                                                <div class="text-sm text-gray-500">
-                                                    ${dist.nom_distributeur} ${dist.pnom_distributeur}
-                                                </div>
-                                            </div>
-                                            <div class="text-right">
-                                                <div class="text-sm text-yellow-600">
-                                                    ${dist.grade_display}
-                                                </div>
-                                                ${dist.id_distrib_parent ? `
-                                                    <div class="text-xs text-gray-400">
-                                                        Parent: ${dist.id_distrib_parent}
-                                                    </div>
-                                                ` : ''}
-                                            </div>
-                                        </div>
+                                    <div class="text-sm text-gray-600">
+                                        Matricule: #${dist.distributeur_id} • Grade: ${dist.grade_display || '★'.repeat(dist.etoiles_id || 0)}
                                     </div>
                                 </div>
+                                <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                                </svg>
                             </div>
                         `).join('');
                     }
+
                     searchResults.classList.remove('hidden');
                 })
                 .catch(error => {
+                    console.error('Erreur de recherche:', error);
                     searchSpinner.classList.add('hidden');
-                    console.error('Erreur:', error);
                     searchResults.innerHTML = `
-                        <div class="p-6 text-center">
-                            <svg class="mx-auto h-12 w-12 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                            </svg>
-                            <p class="mt-2 text-sm text-red-600">Erreur lors de la recherche</p>
-                            <p class="text-xs text-gray-500">Veuillez réessayer</p>
+                        <div class="p-4 text-center text-red-600">
+                            <p>Erreur lors de la recherche</p>
                         </div>
                     `;
                     searchResults.classList.remove('hidden');
@@ -362,21 +347,21 @@
         }, 300);
     });
 
-    // Sélection d'un distributeur
-    function selectDistributeur(id, text) {
-        selectedDistributeur = id;
+    // Sélectionner un distributeur
+    function selectDistributeur(id, name) {
+        selectedDistributeur = { id, name };
         distributeurIdInput.value = id;
-        selectedText.textContent = text;
-
         searchInput.value = '';
         searchResults.classList.add('hidden');
+
+        selectedText.textContent = `#${id} - ${name}`;
         selectedDiv.classList.remove('hidden');
 
         checkFormValidity();
     }
 
-    // Effacer la sélection
-    function clearSelection() {
+    // Réinitialiser la sélection
+    function resetDistributeur() {
         selectedDistributeur = null;
         distributeurIdInput.value = '';
         selectedDiv.classList.add('hidden');
@@ -385,43 +370,17 @@
         checkFormValidity();
     }
 
-    // Fonction globale pour vérifier la validité du formulaire
-    window.checkFormValidity = function() {
-        const hasDistributeur = distributeurIdInput.value !== '';
-        const periodInput = document.getElementById('period-input');
-        const hasPeriod = periodInput && periodInput.value.match(/^\d{4}-\d{2}$/);
-
-        console.log('Validation:', { hasDistributeur, hasPeriod, periodValue: periodInput?.value });
-
-        if (hasDistributeur && hasPeriod) {
-            submitButton.disabled = false;
-            submitButton.classList.remove('from-gray-400', 'to-gray-500', 'cursor-not-allowed');
-            submitButton.classList.add('from-blue-600', 'to-indigo-600', 'hover:from-blue-700', 'hover:to-indigo-700');
-            buttonText.textContent = 'Générer l\'aperçu du réseau';
-        } else {
-            submitButton.disabled = true;
-            submitButton.classList.add('from-gray-400', 'to-gray-500', 'cursor-not-allowed');
-            submitButton.classList.remove('from-blue-600', 'to-indigo-600', 'hover:from-blue-700', 'hover:to-indigo-700');
-
-            if (!hasDistributeur) {
-                buttonText.textContent = 'Sélectionnez d\'abord un distributeur';
-            } else {
-                buttonText.textContent = 'Sélectionnez une période valide (AAAA-MM)';
-            }
-        }
-    }
-
-    // Fonction Alpine.js pour la recherche de période
+    // Fonction Alpine.js pour la recherche de périodes
     function periodSearch() {
         return {
-            periodValue: '',
+            periodValue: '{{ old("period") }}',
             suggestions: [],
             showSuggestions: false,
             loading: false,
             searchTimeout: null,
 
             init() {
-                // Écouter les changements pour la validation du formulaire
+                // Observer les changements de valeur pour valider le formulaire
                 this.$watch('periodValue', (value) => {
                     console.log('Period value changed:', value);
                     // Appeler la fonction globale
@@ -517,5 +476,3 @@
     });
 </script>
 @endpush
-
-@endsection

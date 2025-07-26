@@ -52,8 +52,17 @@ class Bonus extends Model
         return $this->belongsTo(User::class, 'validated_by');
     }
 
-    public function scopeForPeriod($query, string $period)
+    /**
+     * Scope pour filtrer par période
+     * Correction : accepte maintenant une période nullable
+     */
+    public function scopeForPeriod($query, ?string $period = null)
     {
+        // Si la période est null ou vide, on ne filtre pas
+        if (empty($period)) {
+            return $query;
+        }
+
         return $query->where('period', $period);
     }
 

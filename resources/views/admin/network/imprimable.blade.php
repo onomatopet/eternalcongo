@@ -5,8 +5,8 @@
         <title>{{ $mainDistributor->distributeur_id }}_{{ strtoupper($mainDistributor->nom_distributeur) }}_NETWORK_STRUCTURE </title>
         <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
         <!-- Styles -->
-        <link type="text/css" rel="stylesheet" href="{{ asset('assets/plugins/materialize/css/materialize.min.css') }}"/>
-        <link href="{{ asset('assets/plugins/tabfinaltables/css/jquery.tabfinalTables.min.css') }}" rel="stylesheet">
+        <link type="text/css" rel="stylesheet" href="{{ asset('assets/css/materialize.min.css') }}"/>
+        <link href="{{ asset('assets/css/jquery.tabfinalTables.min.css') }}" rel="stylesheet">
 
     <style>
 
@@ -69,7 +69,12 @@
 <body>
 
 <div class="col s12 m-t-sm boutonPrint">
-    <button><a href="#" onclick="print();" class="waves-effect waves-light btn"><i class="material-icons right">print</i>IMPRIMER LE BON</a></button>
+    <button onclick="print();" class="inline-flex items-center px-4 py-2 bg-gray-600 text-white text-sm font-medium rounded-lg hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 transition-colors duration-200">
+        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/>
+        </svg>
+        Imprimer
+    </button>
 </div>
 
 <table align="center">
