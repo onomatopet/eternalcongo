@@ -103,7 +103,7 @@ class BatchAggregationService
         return Achat::where('period', $period)
                    ->where('statut', 'validé') // Seulement les achats validés
                    ->groupBy('distributeur_id')
-                   ->selectRaw('distributeur_id, SUM(pointvaleur) as total_points, SUM(montant_total_ligne) as total_montant, COUNT(*) as nb_achats')
+                   ->selectRaw('distributeur_id, SUM(points_unitaire_achat * qt) as total_points, SUM(montant_total_ligne) as total_montant, COUNT(*) as nb_achats')
                    ->get()
                    ->keyBy('distributeur_id');
     }
@@ -224,37 +224,37 @@ class BatchAggregationService
         // Résumé général
         $report['summary'] = [
             'total_distributeurs_actifs' => LevelCurrent::where('period', $period)
-                                                       ->where('new_cumul', '>', 0)
-                                                       ->count(),
-            'total_points' => LevelCurrent::where('period', $period)->sum('new_cumul'),
-            'average_points' => LevelCurrent::where('period', $period)
-                                          ->where('new_cumul', '>', 0)
-                                          ->avg('new_cumul')
+                                                        ->where('new_cumul', '>', 0)
+                                                        ->count(),
+            'total_points_distribues' => LevelCurrent::where('period', $period)
+                                                     ->sum('new_cumul'),
+            'cumul_collectif_total' => LevelCurrent::where('period', $period)
+                                                   ->sum('cumul_collectif')
         ];
 
         // Top performers
         $report['top_performers'] = LevelCurrent::where('period', $period)
                                                ->where('new_cumul', '>', 0)
                                                ->orderBy('new_cumul', 'desc')
-                                               ->limit(10)
+                                               ->take(10)
                                                ->with('distributeur')
                                                ->get()
-                                               ->map(function($level) {
+                                               ->map(function ($level) {
                                                    return [
                                                        'matricule' => $level->distributeur->distributeur_id,
-                                                       'nom' => $level->distributeur->nom_distributeur . ' ' . $level->distributeur->pnom_distributeur,
-                                                       'points' => $level->new_cumul,
+                                                       'nom' => $level->distributeur->nom_distributeur,
+                                                       'points_periode' => $level->new_cumul,
+                                                       'cumul_individuel' => $level->cumul_individuel,
                                                        'grade' => $level->etoiles
                                                    ];
                                                });
 
         // Statistiques par grade
         $report['statistics']['by_grade'] = LevelCurrent::where('period', $period)
-                                                       ->where('new_cumul', '>', 0)
-                                                       ->groupBy('etoiles')
-                                                       ->selectRaw('etoiles, COUNT(*) as count, SUM(new_cumul) as total_points, AVG(new_cumul) as avg_points')
-                                                       ->orderBy('etoiles')
-                                                       ->get();
+                                                        ->selectRaw('etoiles, COUNT(*) as count, AVG(new_cumul) as avg_points')
+                                                        ->groupBy('etoiles')
+                                                        ->orderBy('etoiles')
+                                                        ->get();
 
         return $report;
     }

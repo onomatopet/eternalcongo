@@ -16,6 +16,7 @@ use App\Http\Controllers\Admin\DeletionRequestController;
 use App\Http\Controllers\Admin\ModificationRequestController;
 use App\Http\Controllers\Admin\AchatReturnController;
 use App\Http\Controllers\Admin\NetworkExportController;
+use App\Http\Controllers\Admin\WorkflowController;
 
 // Controllers Distributor (à créer)
 use App\Http\Controllers\Distributor\DistributorDashboardController;
@@ -115,6 +116,17 @@ Route::middleware(['auth', 'verified', 'check_admin_role'])
             Route::get('/performance', [DashboardController::class, 'performance'])->name('performance');
             Route::get('/realtime', [DashboardController::class, 'realtime'])->name('realtime');
             Route::get('/export', [DashboardController::class, 'export'])->name('export');
+        });
+
+        // ===== WORKFLOW DE GESTION DES PÉRIODES =====
+        Route::prefix('workflow')->name('workflow.')->group(function () {
+            Route::get('/{period?}', [WorkflowController::class, 'index'])->name('index');
+            Route::post('/validate-purchases', [WorkflowController::class, 'validatePurchases'])->name('validate-purchases');
+            Route::post('/aggregate-purchases', [WorkflowController::class, 'aggregatePurchases'])->name('aggregate-purchases');
+            Route::post('/calculate-advancements', [WorkflowController::class, 'calculateAdvancements'])->name('calculate-advancements');
+            Route::post('/create-snapshot', [WorkflowController::class, 'createSnapshot'])->name('create-snapshot');
+            Route::post('/close-period', [WorkflowController::class, 'closePeriod'])->name('close-period');
+            Route::get('/history/{period}', [WorkflowController::class, 'history'])->name('history');
         });
 
         // ===== GESTION DES DISTRIBUTEURS =====

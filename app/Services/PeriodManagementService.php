@@ -26,6 +26,7 @@ class PeriodManagementService
 
     /**
      * Clôture la période courante et initialise la suivante
+     * MODIFIÉ : Ne fait plus l'agrégation ni la propagation (déjà fait dans le workflow)
      */
     public function closePeriod(string $currentPeriod, int $userId): array
     {
@@ -36,23 +37,18 @@ class PeriodManagementService
         if (!$period || !$period->canBeClosed()) {
             return [
                 'success' => false,
-                'message' => 'La période ne peut pas être clôturée. Elle doit être en phase de validation.'
+                'message' => 'La période ne peut pas être clôturée. Assurez-vous que toutes les étapes du workflow sont complétées.'
             ];
         }
 
         DB::beginTransaction();
         try {
-            // 1. Exécuter l'agrégation finale en batch
             Log::info("Début de la clôture de période: {$currentPeriod}");
-            $aggregationResult = $this->purchaseAggregation->aggregateAndApplyPurchases($currentPeriod);
 
-            // 2. Propager les cumuls dans la hiérarchie
-            $this->propagateCumulsInHierarchy($currentPeriod);
-
-            // 3. Créer le résumé de clôture
+            // 1. Créer le résumé de clôture
             $closureSummary = $this->generateClosureSummary($currentPeriod);
 
-            // 4. Marquer la période comme clôturée
+            // 2. Marquer la période comme clôturée
             $period->update([
                 'status' => SystemPeriod::STATUS_CLOSED,
                 'closed_at' => now(),
@@ -61,7 +57,7 @@ class PeriodManagementService
                 'is_current' => false
             ]);
 
-            // 5. Créer et initialiser la nouvelle période
+            // 3. Créer et initialiser la nouvelle période
             $nextPeriod = $this->initializeNextPeriod($currentPeriod);
 
             DB::commit();
@@ -88,29 +84,15 @@ class PeriodManagementService
     }
 
     /**
-     * Propage les cumuls dans toute la hiérarchie après agrégation
+     * SUPPRIMÉ : Cette méthode n'est plus nécessaire car la propagation
+     * est faite lors de l'étape d'agrégation dans le workflow
      */
+    /*
     protected function propagateCumulsInHierarchy(string $period): void
     {
-        // Récupérer tous les distributeurs ayant eu des achats dans la période
-        $activeDistributors = Achat::where('period', $period)
-            ->distinct('distributeur_id')
-            ->pluck('distributeur_id');
-
-        foreach ($activeDistributors as $distributorId) {
-            // Récupérer le montant total des achats du distributeur
-            $totalAchats = Achat::where('distributeur_id', $distributorId)
-                               ->where('period', $period)
-                               ->sum('pointvaleur');
-
-            if ($totalAchats > 0) {
-                // Propager dans la hiérarchie parentale
-                $this->cumulManagement->propagateToParents($distributorId, $totalAchats, $period);
-            }
-        }
-
-        Log::info("Propagation des cumuls terminée pour {$activeDistributors->count()} distributeurs actifs");
+        // Méthode supprimée - la propagation se fait maintenant dans WorkflowController::aggregatePurchases()
     }
+    */
 
     /**
      * Génère le résumé de clôture
@@ -122,9 +104,9 @@ class PeriodManagementService
                                                 ->distinct('distributeur_id')
                                                 ->count(),
             'total_achats' => Achat::where('period', $period)->count(),
-            'total_points' => Achat::where('period', $period)->sum('pointvaleur'),
+            'total_points' => Achat::where('period', $period)->sum(DB::raw('points_unitaire_achat * qt')),
             'total_montant' => Achat::where('period', $period)->sum('montant_total_ligne'),
-            'nouveaux_grades' => DB::table('avancement_histories')
+            'nouveaux_grades' => DB::table('avancement_history')
                                   ->where('period', $period)
                                   ->count(),
             'timestamp' => now()->toISOString()

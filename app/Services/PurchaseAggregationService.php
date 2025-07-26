@@ -4,7 +4,7 @@
 namespace App\Services;
 
 use App\Models\Achat;
-use App\Models\Level_current_test;
+use App\Models\LevelCurrent;
 use App\Models\Distributeur;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -21,16 +21,16 @@ class PurchaseAggregationService
      *
      * @param string $period
      * @return array ['message' => string, 'active_distributors_details' => Collection]
-     *         active_distributors_details contient les objets Level_current_test des distributeurs actifs
+     *         active_distributors_details contient les objets LevelCurrent des distributeurs actifs
      */
     public function aggregateAndApplyPurchases(string $period): array
     {
         Log::info("[PAA] Début du traitement des achats pour la période: {$period}");
 
-        $achatsAgreges = Achat::selectRaw('distributeur_id, SUM(pointvaleur) as total_new_achats')
+        $achatsAgreges = Achat::selectRaw('distributeur_id, SUM(points_unitaire_achat * qt) as total_new_achats')
             ->where('period', $period)
             ->groupBy('distributeur_id')
-            ->havingRaw('SUM(pointvaleur) > 0')
+            ->havingRaw('SUM(points_unitaire_achat * qt) > 0')
             ->get()
             ->keyBy('distributeur_id');
 
@@ -40,7 +40,7 @@ class PurchaseAggregationService
         }
         Log::info("[PAA] Achats agrégés pour {$achatsAgreges->count()} distributeurs.");
 
-        $existingLevels = Level_current_test::where('period', $period)
+        $existingLevels = LevelCurrent::where('period', $period)
             ->whereIn('distributeur_id', $achatsAgreges->keys())
             ->get()
             ->keyBy('distributeur_id');
@@ -48,7 +48,7 @@ class PurchaseAggregationService
         $distributeursACreerIds = $achatsAgreges->keys()->diff($existingLevels->keys());
         $updatesData = [];
         $insertsData = [];
-        $distributorMatriculesActifs = $achatsAgreges->keys()->toArray(); // Pour récupérer les modèles complets plus tard
+        $distributorIdsActifs = $achatsAgreges->keys()->toArray(); // Pour récupérer les modèles complets plus tard
 
         // Préparer les mises à jour
         foreach ($existingLevels as $distribId => $level) {
@@ -67,10 +67,10 @@ class PurchaseAggregationService
 
         // Préparer les insertions
         if ($distributeursACreerIds->isNotEmpty()) {
-            $distributeursInfo = Distributeur::whereIn('distributeur_id', $distributeursACreerIds)
-                ->select('distributeur_id', 'id_distrib_parent', 'rang')
+            $distributeursInfo = Distributeur::whereIn('id', $distributeursACreerIds)
+                ->select('id', 'distributeur_id', 'id_distrib_parent', 'rang')
                 ->get()
-                ->keyBy('distributeur_id');
+                ->keyBy('id');
 
             foreach ($distributeursACreerIds as $distribId) {
                 $achat = $achatsAgreges->get($distribId);
@@ -91,7 +91,7 @@ class PurchaseAggregationService
                         'updated_at' => Carbon::now(),
                     ];
                 } else {
-                    Log::warning("[PAA] Infos manquantes pour créer Level_current_test pour distrib_id {$distribId} période {$period}.");
+                    Log::warning("[PAA] Infos manquantes pour créer LevelCurrent pour distrib_id {$distribId} période {$period}.");
                 }
             }
         }
@@ -103,7 +103,7 @@ class PurchaseAggregationService
             DB::beginTransaction();
             if (!empty($updatesData)) {
                 foreach ($updatesData as $data) {
-                    $affected = Level_current_test::where('distributeur_id', $data['distributeur_id'])
+                    $affected = LevelCurrent::where('distributeur_id', $data['distributeur_id'])
                         ->where('period', $data['period'])
                         ->update([
                             'new_cumul' => $data['new_cumul_assign'],
@@ -117,21 +117,21 @@ class PurchaseAggregationService
             }
             if (!empty($insertsData)) {
                 foreach (array_chunk($insertsData, 500) as $chunk) {
-                    Level_current_test::insert($chunk);
+                    LevelCurrent::insert($chunk);
                     $insertedCount += count($chunk);
                 }
             }
             DB::commit();
 
-            // Récupérer les modèles Level_current_test complets pour les distributeurs actifs pour le retour
-            $activeDistributorsDetails = Level_current_test::where('period', $period)
-                ->whereIn('distributeur_id', $distributorMatriculesActifs)
+            // Récupérer les modèles LevelCurrent complets pour les distributeurs actifs pour le retour
+            $activeDistributorsDetails = LevelCurrent::where('period', $period)
+                ->whereIn('distributeur_id', $distributorIdsActifs)
                 ->get();
 
             Log::info("[PAA] Traitement achats terminé pour {$period}. MàJ:{$updatedCount}, Ins:{$insertedCount}.");
             return [
                 'message' => "Achats appliqués pour {$period}. MàJ:{$updatedCount}, Ins:{$insertedCount}.",
-                'active_distributors_details' => $activeDistributorsDetails // Retourne les modèles LCT
+                'active_distributors_details' => $activeDistributorsDetails // Retourne les modèles LevelCurrent
             ];
         } catch (\Exception $e) {
             DB::rollBack();
